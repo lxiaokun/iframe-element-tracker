@@ -1,9 +1,9 @@
 /**
- * 消息类型标识，用于区分来自本 SDK 的消息
+ * Message type identifier to distinguish messages from this SDK
  */
-export const MESSAGE_TYPE = 'IFRAME_OVERLAY_SDK';
+export const MESSAGE_TYPE = 'IFRAME_ELEMENT_TRACKER';
 
 /**
- * 默认的节流延迟（毫秒）
+ * Default throttle delay (milliseconds)
  */
-export const DEFAULT_THROTTLE_DELAY = 16; // 约 60fps
+export const DEFAULT_THROTTLE_DELAY = 16; // ~60fps

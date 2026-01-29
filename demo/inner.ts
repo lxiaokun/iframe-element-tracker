@@ -1,9 +1,9 @@
 import { TrackerSDK } from '../src/tracker';
 
-// 创建 TrackerSDK 实例
+// Create TrackerSDK instance
 const tracker = new TrackerSDK();
 
-// 注册所有需要追踪的元素
+// Elements to track
 const elementsToTrack = [
   { id: 'element-edge-top', label: 'Edge Top' },
   { id: 'element-edge-left', label: 'Edge Left' },
@@ -15,7 +15,7 @@ const elementsToTrack = [
   { id: 'element-bottom', label: 'Bottom Element' },
 ];
 
-// 等待 DOM 完全加载后注册元素
+// Register elements after DOM is fully loaded
 document.addEventListener('DOMContentLoaded', () => {
   elementsToTrack.forEach(({ id, label }) => {
     const element = document.getElementById(id);
@@ -29,5 +29,5 @@ document.addEventListener('DOMContentLoaded', () => {
   console.log('TrackerSDK initialized, tracking', elementsToTrack.length, 'elements');
 });
 
-// 暴露到全局，方便调试
+// Expose to global for debugging
 (window as any).tracker = tracker;

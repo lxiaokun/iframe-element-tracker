@@ -10,27 +10,27 @@ import {
 } from '../shared';
 
 /**
- * 注册元素的选项
+ * Options for registering an element
  */
 export interface RegisterOptions {
-  /** 用户自定义数据 */
+  /** User-defined custom data */
   metadata?: Record<string, unknown>;
 }
 
 /**
- * TrackerSDK 配置选项
+ * TrackerSDK configuration options
  */
 export interface TrackerOptions {
-  /** 目标窗口，默认为 window.parent */
+  /** Target window, defaults to window.parent */
   targetWindow?: Window;
-  /** 目标 origin，默认为 '*' */
+  /** Target origin, defaults to '*' */
   targetOrigin?: string;
-  /** 节流延迟（毫秒），默认 16ms */
+  /** Throttle delay in milliseconds, defaults to 16ms */
   throttleDelay?: number;
 }
 
 /**
- * 被追踪元素的内部记录
+ * Internal record for a tracked element
  */
 interface TrackedElement {
   element: Element;
@@ -40,8 +40,8 @@ interface TrackedElement {
 }
 
 /**
- * TrackerSDK - 在 iframe 内页面中使用
- * 用于注册和追踪 DOM 元素的位置、尺寸和样式变化
+ * TrackerSDK - Used inside iframe pages
+ * Registers and tracks DOM element position, size, and style changes
  */
 export class TrackerSDK {
   private trackedElements: Map<string, TrackedElement> = new Map();
@@ -60,12 +60,12 @@ export class TrackerSDK {
     this.targetOrigin = options.targetOrigin ?? '*';
     this.throttleDelay = options.throttleDelay ?? DEFAULT_THROTTLE_DELAY;
 
-    // 创建 ResizeObserver 监听元素尺寸变化
+    // Create ResizeObserver to monitor element size changes
     this.resizeObserver = new ResizeObserver(() => {
       this.scheduleUpdate();
     });
 
-    // 创建 IntersectionObserver 监听元素可见性变化
+    // Create IntersectionObserver to monitor element visibility changes
     this.intersectionObserver = new IntersectionObserver(
       () => {
         this.scheduleUpdate();
@@ -75,23 +75,23 @@ export class TrackerSDK {
       }
     );
 
-    // 滚动事件处理
+    // Scroll event handler - sync update for best responsiveness
     this.scrollHandler = () => {
-      this.scheduleUpdate();
+      this.performUpdate();
     };
 
-    // 窗口 resize 事件处理
+    // Window resize event handler
     this.resizeHandler = () => {
-      this.scheduleUpdate();
+      this.performUpdate();
     };
 
-    // 绑定事件
+    // Bindvents
     window.addEventListener('scroll', this.scrollHandler, { passive: true, capture: true });
     window.addEventListener('resize', this.resizeHandler, { passive: true });
   }
 
   /**
-   * 注册一个元素进行追踪
+   * Register an element for tracking
    */
   register(element: Element, id: string, options: RegisterOptions = {}): void {
     if (this.isDestroyed) {
@@ -115,12 +115,12 @@ export class TrackerSDK {
     this.resizeObserver.observe(element);
     this.intersectionObserver.observe(element);
 
-    // 立即发送初始状态
+    // Send initial state immediately
     this.sendUpdate('init', [this.getElementRect(tracked)]);
   }
 
   /**
-   * 取消注册一个元素
+   * Unregister an element
    */
   unregister(id: string): void {
     const tracked = this.trackedElements.get(id);
@@ -132,12 +132,12 @@ export class TrackerSDK {
     this.intersectionObserver.unobserve(tracked.element);
     this.trackedElements.delete(id);
 
-    // 发送移除通知
+    // Send remove notification
     this.sendUpdate('remove', [{ id } as ElementRect]);
   }
 
   /**
-   * 更新元素的 metadata
+   * Update element's metadata
    */
   updateMetadata(id: string, metadata: Record<string, unknown>): void {
     const tracked = this.trackedElements.get(id);
@@ -150,14 +150,14 @@ export class TrackerSDK {
   }
 
   /**
-   * 手动触发更新
+   * Manually trigger an update
    */
   forceUpdate(): void {
     this.performUpdate();
   }
 
   /**
-   * 销毁 SDK，清理所有资源
+   * Destroy SDK and clean up all resources
    */
   destroy(): void {
     if (this.isDestroyed) {
@@ -179,7 +179,7 @@ export class TrackerSDK {
   }
 
   /**
-   * 调度一次更新（节流）
+   * Schedule an update (throttled)
    */
   private scheduleUpdate(): void {
     if (this.pendingUpdate !== null || this.isDestroyed) {
@@ -193,7 +193,7 @@ export class TrackerSDK {
   }
 
   /**
-   * 执行更新，计算所有元素的最新状态并发送
+   * Perform update - calculate latest state for all elements and send
    */
   private performUpdate(): void {
     if (this.isDestroyed || this.trackedElements.size === 0) {
@@ -212,19 +212,45 @@ export class TrackerSDK {
   }
 
   /**
-   * 获取元素的完整信息
+   * Get complete element information
    */
   private getElementRect(tracked: TrackedElement): ElementRect {
     const { element, id, metadata } = tracked;
     const domRect = element.getBoundingClientRect();
     const computedStyle = getComputedStyle(element);
+    const htmlElement = element as HTMLElement;
 
-    const bounds: Bounds = {
-      x: domRect.x,
-      y: domRect.y,
-      width: domRect.width,
-      height: domRect.height,
-    };
+    // Check if element has transform
+    const hasTransform = computedStyle.transform && computedStyle.transform !== 'none';
+
+    let bounds: Bounds;
+
+    if (hasTransform) {
+      // When transformed, use offsetWidth/offsetHeight for original size
+      // Position is calculated from bounding box center
+      const originalWidth = htmlElement.offsetWidth;
+      const originalHeight = htmlElement.offsetHeight;
+
+      // getBoundingClientRect returns the transformed bounding box
+      // We need to calculate the original rect's top-left position
+      // For simple cases, use bounding box center for approximate positioning
+      const centerX = domRect.x + domRect.width / 2;
+      const centerY = domRect.y + domRect.height / 2;
+
+      bounds = {
+        x: centerX - originalWidth / 2,
+        y: centerY - originalHeight / 2,
+        width: originalWidth,
+        height: originalHeight,
+      };
+    } else {
+      bounds = {
+        x: domRect.x,
+        y: domRect.y,
+        width: domRect.width,
+        height: domRect.height,
+      };
+    }
 
     const visibility = this.getVisibility(element, domRect);
     const styles = this.getStyles(computedStyle);
@@ -242,12 +268,12 @@ export class TrackerSDK {
   }
 
   /**
-   * 获取元素可见性信息
+   * Get element visibility information
    */
   private getVisibility(element: Element, domRect: DOMRect): ElementVisibility {
     const computedStyle = getComputedStyle(element);
 
-    // 检查 display: none 或 visibility: hidden
+    // Check for display: none or visibility: hidden
     if (computedStyle.display === 'none') {
       return {
         isVisible: false,
@@ -266,7 +292,7 @@ export class TrackerSDK {
       };
     }
 
-    // 检查尺寸是否为 0
+    // Check if size is 0
     if (domRect.width === 0 || domRect.height === 0) {
       return {
         isVisible: false,
@@ -276,7 +302,7 @@ export class TrackerSDK {
       };
     }
 
-    // 计算与视口的交集
+    // Calculate intersection with viewport
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
@@ -288,7 +314,7 @@ export class TrackerSDK {
     const visibleWidth = Math.max(0, visibleRight - visibleX);
     const visibleHeight = Math.max(0, visibleBottom - visibleY);
 
-    // 完全在视口外
+    // Completely outside viewport
     if (visibleWidth === 0 || visibleHeight === 0) {
       return {
         isVisible: false,
@@ -318,7 +344,7 @@ export class TrackerSDK {
   }
 
   /**
-   * 获取元素样式信息
+   * Get element style information
    */
   private getStyles(style: CSSStyleDeclaration): ElementStyles {
     return {
@@ -361,7 +387,7 @@ export class TrackerSDK {
   }
 
   /**
-   * 解析间距属性
+   * Parse spacing properties
    */
   private parseSpacing(
     style: CSSStyleDeclaration,
@@ -376,7 +402,7 @@ export class TrackerSDK {
   }
 
   /**
-   * 获取元素滚动状态
+   * Get element scroll state
    */
   private getScroll(element: Element): ElementRect['scroll'] | undefined {
     if (element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight) {
@@ -391,7 +417,7 @@ export class TrackerSDK {
   }
 
   /**
-   * 发送更新消息到宿主页面
+   * Send update message to host page
    */
   private sendUpdate(action: OverlayMessage['action'], elements: ElementRect[]): void {
     const message: OverlayMessage = {
