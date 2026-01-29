@@ -82,13 +82,27 @@ export interface ElementScroll {
 }
 
 /**
+ * DOM element attributes (id, class, dataset)
+ */
+export interface ElementAttributes {
+  /** Element's id attribute */
+  elementId: string;
+  /** Element's class list */
+  classList: string[];
+  /** Element's data-* attributes */
+  dataset: Record<string, string>;
+}
+
+/**
  * Complete information of a tracked element
  */
 export interface ElementRect {
-  /** Unique element identifier */
+  /** Unique tracker identifier */
   id: string;
   /** Update timestamp */
   timestamp: number;
+  /** DOM element attributes (id, class, dataset) */
+  attributes: ElementAttributes;
   /** Position and size (from getBoundingClientRect) */
   bounds: Bounds;
   /** Visibility information */

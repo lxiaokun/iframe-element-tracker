@@ -2,6 +2,7 @@ import {
   ElementRect,
   ElementStyles,
   ElementVisibility,
+  ElementAttributes,
   Bounds,
   Spacing,
   OverlayMessage,
@@ -255,15 +256,36 @@ export class TrackerSDK {
     const visibility = this.getVisibility(element, domRect);
     const styles = this.getStyles(computedStyle);
     const scroll = this.getScroll(element);
+    const attributes = this.getAttributes(htmlElement);
 
     return {
       id,
       timestamp: Date.now(),
+      attributes,
       bounds,
       visibility,
       styles,
       scroll,
       metadata,
+    };
+  }
+
+  /**
+   * Get DOM element attributes (id, class, dataset)
+   */
+  private getAttributes(element: HTMLElement): ElementAttributes {
+    // Convert DOMStringMap to plain object
+    const dataset: Record<string, string> = {};
+    for (const key in element.dataset) {
+      if (Object.prototype.hasOwnProperty.call(element.dataset, key)) {
+        dataset[key] = element.dataset[key] || '';
+      }
+    }
+
+    return {
+      elementId: element.id || '',
+      classList: Array.from(element.classList),
+      dataset,
     };
   }
 
