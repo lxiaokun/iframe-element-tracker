@@ -1,18 +1,36 @@
 import { ReceiverSDK } from '../src/receiver';
 import type { ElementRect } from '../src/shared';
 
-// Overlay 渲染模式
+// Overlay rendering mode
 type OverlayMode = 'passthrough' | 'interactive' | 'labeled' | 'rich';
 
 let currentMode: OverlayMode = 'passthrough';
 let receiver: ReceiverSDK | null = null;
 
-// DOM 元素引用
+// DOM element references
 const iframe = document.getElementById('inner-frame') as HTMLIFrameElement;
 const overlayContainer = document.getElementById('overlay-container')!;
 const statusContent = document.getElementById('status-content')!;
 
-// 模式切换按钮
+// Get iframe border width (for coordinate offset correction)
+function getIframeBorderOffset(): { left: number; top: number } {
+  const style = window.getComputedStyle(iframe);
+  return {
+    left: parseFloat(style.borderLeftWidth) || 0,
+    top: parseFloat(style.borderTopWidth) || 0,
+  };
+}
+
+// Get overlay container offset relative to iframe
+function getContainerOffset(): { left: number; top: number } {
+  const containerStyle = window.getComputedStyle(overlayContainer);
+  return {
+    left: parseFloat(containerStyle.left) || 0,
+    top: parseFloat(containerStyle.top) || 0,
+  };
+}
+
+// Mode switch buttons
 const modeButtons = {
   passthrough: document.getElementById('mode-passthrough')!,
   interactive: document.getElementById('mode-interactive')!,
@@ -20,11 +38,11 @@ const modeButtons = {
   rich: document.getElementById('mode-rich')!,
 };
 
-// 存储 overlay DOM 元素
+// Store overlay DOM elements
 const overlayElements: Map<string, HTMLElement> = new Map();
 
 /**
- * 初始化 ReceiverSDK
+ * Initialize ReceiverSDK
  */
 function initReceiver() {
   receiver = new ReceiverSDK(iframe);
@@ -47,7 +65,7 @@ function initReceiver() {
 }
 
 /**
- * 创建 overlay 元素
+ * Create overlay element
  */
 function createOverlay(elementRect: ElementRect) {
   const overlay = document.createElement('div');
@@ -59,7 +77,7 @@ function createOverlay(elementRect: ElementRect) {
 }
 
 /**
- * 更新 overlay 元素
+ * Update overlay element
  */
 function updateOverlay(elementRect: ElementRect) {
   let overlay = overlayElements.get(elementRect.id);
@@ -73,13 +91,13 @@ function updateOverlay(elementRect: ElementRect) {
 }
 
 /**
- * 更新 overlay 样式和位置
+ * Update overlay style and position
  */
 function updateOverlayStyle(overlay: HTMLElement, elementRect: ElementRect) {
   const { bounds, visibility, styles } = elementRect;
   const metadata = elementRect.metadata as { label?: string } | undefined;
 
-  // 如果元素不可见，隐藏 overlay
+  // Hide overlay if element is not visible
   if (!visibility.isVisible) {
     overlay.style.display = 'none';
     return;
@@ -87,16 +105,24 @@ function updateOverlayStyle(overlay: HTMLElement, elementRect: ElementRect) {
 
   overlay.style.display = 'block';
 
-  // 设置位置和尺寸
-  overlay.style.left = `${bounds.x}px`;
-  overlay.style.top = `${bounds.y}px`;
+  // Get iframe border offset for coordinate correction
+  const borderOffset = getIframeBorderOffset();
+  // Get container offset relative to iframe-wrapper (container may be larger than iframe)
+  const containerOffset = getContainerOffset();
+
+  // Set position and size
+  // bounds.x/y are coordinates within the iframe
+  // + borderOffset compensates for iframe border
+  // - containerOffset compensates for container's negative offset
+  overlay.style.left = `${bounds.x + borderOffset.left - containerOffset.left}px`;
+  overlay.style.top = `${bounds.y + borderOffset.top - containerOffset.top}px`;
   overlay.style.width = `${bounds.width}px`;
   overlay.style.height = `${bounds.height}px`;
 
-  // 应用 border-radius
+  // Apply border-radius
   overlay.style.borderRadius = `${styles.border.radius.topLeft} ${styles.border.radius.topRight} ${styles.border.radius.bottomRight} ${styles.border.radius.bottomLeft}`;
 
-  // 应用 transform
+  // Apply transform
   if (styles.transform) {
     overlay.style.transform = styles.transform;
     overlay.style.transformOrigin = styles.transformOrigin;
@@ -104,15 +130,15 @@ function updateOverlayStyle(overlay: HTMLElement, elementRect: ElementRect) {
     overlay.style.transform = '';
   }
 
-  // 根据模式设置类名和内容
+  // Set class name and content based on mode
   applyOverlayMode(overlay, elementRect, metadata?.label);
 }
 
 /**
- * 应用 overlay 模式
+ * Apply overlay mode
  */
 function applyOverlayMode(overlay: HTMLElement, elementRect: ElementRect, label?: string) {
-  // 清除旧的类名和子元素
+  // Clear old class names and child elements
   overlay.className = '';
   overlay.innerHTML = '';
 
@@ -166,7 +192,7 @@ function applyOverlayMode(overlay: HTMLElement, elementRect: ElementRect, label?
 }
 
 /**
- * 移除 overlay 元素
+ * Remove overlay element
  */
 function removeOverlay(id: string) {
   const overlay = overlayElements.get(id);
@@ -177,7 +203,7 @@ function removeOverlay(id: string) {
 }
 
 /**
- * 更新状态面板
+ * Update status panel
  */
 function updateStatus() {
   if (!receiver) {
@@ -210,17 +236,17 @@ function updateStatus() {
 }
 
 /**
- * 切换 overlay 模式
+ * Switch overlay mode
  */
 function setMode(mode: OverlayMode) {
   currentMode = mode;
 
-  // 更新按钮状态
+  // Update button states
   Object.entries(modeButtons).forEach(([key, btn]) => {
     btn.classList.toggle('active', key === mode);
   });
 
-  // 重新渲染所有 overlay
+  // Re-render all overlays
   if (receiver) {
     receiver.getElements().forEach((el) => {
       updateOverlay(el);
@@ -229,7 +255,7 @@ function setMode(mode: OverlayMode) {
 }
 
 /**
- * 重新渲染所有 overlay（当模式切换时）
+ * Re-render all overlays (when mode switches)
  */
 function rerenderOverlays() {
   if (!receiver) return;
@@ -243,17 +269,17 @@ function rerenderOverlays() {
   });
 }
 
-// 绑定模式切换按钮事件
+// Bindmode switch button events
 Object.entries(modeButtons).forEach(([mode, btn]) => {
   btn.addEventListener('click', () => setMode(mode as OverlayMode));
 });
 
-// iframe 加载完成后初始化
+// Initialize after iframe loads
 iframe.addEventListener('load', () => {
   console.log('iframe loaded, initializing ReceiverSDK');
   initReceiver();
 });
 
-// 暴露到全局，方便调试
+// Expose to global for debugging
 (window as any).receiver = receiver;
 (window as any).setMode = setMode;

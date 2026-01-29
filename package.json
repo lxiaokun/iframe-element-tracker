@@ -1,7 +1,7 @@
 {
-  "name": "iframe-overlay-sdk",
+  "name": "iframe-element-tracker",
   "version": "1.0.0",
-  "description": "SDK for tracking elements in iframe and rendering overlays in host page",
+  "description": "A SDK for tracking DOM elements inside iframes and synchronizing their position, size, and style information to the host page",
   "type": "module",
   "scripts": {
     "dev": "vite",

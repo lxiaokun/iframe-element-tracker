@@ -1,5 +1,5 @@
 /**
- * 间距类型，用于 padding, margin, border-width
+ * Spacing type for padding, margin, border-width
  */
 export interface Spacing {
   top: number;
@@ -9,7 +9,7 @@ export interface Spacing {
 }
 
 /**
- * 矩形边界
+ * Rectangle bounds
  */
 export interface Bounds {
   x: number;
@@ -19,24 +19,24 @@ export interface Bounds {
 }
 
 /**
- * 元素可见性信息
+ * Element visibility information
  */
 export interface ElementVisibility {
-  /** 元素是否在视口中可见 */
+  /** Whether the element is visible in the viewport */
   isVisible: boolean;
-  /** 是否完全可见（未被裁剪） */
+  /** Whether fully visible (not clipped) */
   isFullyVisible: boolean;
-  /** 实际可见区域（被裁剪后），不可见时为 null */
+  /** Actual visible area (after clipping), null if not visible */
   visibleBounds: Bounds | null;
-  /** 不可见的原因 */
+  /** Reason for being hidden */
   hiddenReason?: 'offscreen' | 'hidden' | 'collapsed' | 'clipped';
 }
 
 /**
- * 元素样式信息
+ * Element style information
  */
 export interface ElementStyles {
-  // 盒模型
+  // Box model
   boxSizing: 'content-box' | 'border-box';
   padding: Spacing;
   margin: Spacing;
@@ -50,29 +50,29 @@ export interface ElementStyles {
     };
   };
 
-  // 变换
+  // Transform
   transform: string | null;
   transformOrigin: string;
 
-  // 裁剪与溢出
+  // Clipping and overflow
   overflow: { x: string; y: string };
   clipPath: string | null;
 
-  // 显示与层叠
+  // Display and stacking
   display: string;
   opacity: number;
   zIndex: string;
   pointerEvents: string;
   position: string;
 
-  // 可选的视觉效果
+  // Optional visual effects
   outline?: { width: number; offset: number };
   boxShadow?: string;
   filter?: string;
 }
 
 /**
- * 元素滚动状态
+ * Element scroll state
  */
 export interface ElementScroll {
   top: number;
@@ -82,38 +82,38 @@ export interface ElementScroll {
 }
 
 /**
- * 被追踪元素的完整信息
+ * Complete information of a tracked element
  */
 export interface ElementRect {
-  /** 元素唯一标识 */
+  /** Unique element identifier */
   id: string;
-  /** 更新时间戳 */
+  /** Update timestamp */
   timestamp: number;
-  /** 位置和尺寸（来自 getBoundingClientRect） */
+  /** Position and size (from getBoundingClientRect) */
   bounds: Bounds;
-  /** 可见性信息 */
+  /** Visibility information */
   visibility: ElementVisibility;
-  /** CSS 样式信息 */
+  /** CSS style information */
   styles: ElementStyles;
-  /** 滚动状态（如果元素可滚动） */
+  /** Scroll state (if element is scrollable) */
   scroll?: ElementScroll;
-  /** 用户自定义数据 */
+  /** User-defined custom data */
   metadata?: Record<string, unknown>;
 }
 
 /**
- * 消息动作类型
+ * Message action type
  */
 export type MessageAction = 'init' | 'update' | 'remove';
 
 /**
- * iframe 到宿主页面的消息结构
+ * Message structure from iframe to host page
  */
 export interface OverlayMessage {
-  /** 消息类型标识 */
+  /** Message type identifier */
   type: string;
-  /** 动作类型 */
+  /** Action type */
   action: MessageAction;
-  /** 元素信息列表 */
+  /** Element information list */
   elements: ElementRect[];
 }

@@ -6,21 +6,21 @@ import {
 } from '../shared';
 
 /**
- * 事件回调类型
+ * Event callback type
  */
 export type EventCallback = (elements: ElementRect[]) => void;
 
 /**
- * ReceiverSDK 配置选项
+ * ReceiverSDK configuration options
  */
 export interface ReceiverOptions {
-  /** 允许的 origin，默认为 '*'（接受所有来源） */
+  /** Allowed origin, defaults to '*' (accept all origins) */
   allowedOrigin?: string;
 }
 
 /**
- * ReceiverSDK - 在宿主页面中使用
- * 用于接收 iframe 内页面发送的元素追踪信息
+ * ReceiverSDK - Used in host pages
+ * Receives element tracking information sent from iframe pages
  */
 export class ReceiverSDK {
   private iframe: HTMLIFrameElement;
@@ -34,22 +34,22 @@ export class ReceiverSDK {
     this.iframe = iframe;
     this.allowedOrigin = options.allowedOrigin ?? '*';
 
-    // 初始化事件监听器集合
+    // Initialize event listener sets
     this.listeners.set('init', new Set());
     this.listeners.set('update', new Set());
     this.listeners.set('remove', new Set());
 
-    // 消息处理函数
+    // Message handler function
     this.messageHandler = (event: MessageEvent) => {
       this.handleMessage(event);
     };
 
-    // 监听 message 事件
+    // Listen for message events
     window.addEventListener('message', this.messageHandler);
   }
 
   /**
-   * 监听事件
+   * Listen for events
    */
   on(event: MessageAction, callback: EventCallback): void {
     const listeners = this.listeners.get(event);
@@ -59,7 +59,7 @@ export class ReceiverSDK {
   }
 
   /**
-   * 移除事件监听
+   * Remove event listener
    */
   off(event: MessageAction, callback: EventCallback): void {
     const listeners = this.listeners.get(event);
@@ -69,35 +69,35 @@ export class ReceiverSDK {
   }
 
   /**
-   * 获取所有当前追踪的元素
+   * Get all currently tracked elements
    */
   getElements(): Map<string, ElementRect> {
     return new Map(this.elements);
   }
 
   /**
-   * 获取单个元素
+   * Get a single element
    */
   getElement(id: string): ElementRect | undefined {
     return this.elements.get(id);
   }
 
   /**
-   * 获取绑定的 iframe 元素
+   * Get the bound iframe element
    */
   getIframe(): HTMLIFrameElement {
     return this.iframe;
   }
 
   /**
-   * 获取 iframe 在宿主页面中的位置
+   * Get iframe position in the host page
    */
   getIframeBounds(): DOMRect {
     return this.iframe.getBoundingClientRect();
   }
 
   /**
-   * 将 iframe 内的坐标转换为宿主页面的坐标
+   * Transform iframe coordinates to host page coordinates
    */
   transformToHostCoordinates(
     iframeX: number,
@@ -111,7 +111,7 @@ export class ReceiverSDK {
   }
 
   /**
-   * 获取元素在宿主页面中的边界
+   * Get element bounds in host page coordinates
    */
   getElementHostBounds(id: string): {
     x: number;
@@ -138,7 +138,7 @@ export class ReceiverSDK {
   }
 
   /**
-   * 销毁 SDK，清理所有资源
+   * Destroy SDK and clean up all resources
    */
   destroy(): void {
     if (this.isDestroyed) {
@@ -152,30 +152,30 @@ export class ReceiverSDK {
   }
 
   /**
-   * 处理接收到的消息
+   * Handle received messages
    */
   private handleMessage(event: MessageEvent): void {
     if (this.isDestroyed) {
       return;
     }
 
-    // 验证来源
+    // Validate origin
     if (this.allowedOrigin !== '*' && event.origin !== this.allowedOrigin) {
       return;
     }
 
-    // 验证消息来源是否是绑定的 iframe
+    // Validate message source is the bound iframe
     if (event.source !== this.iframe.contentWindow) {
       return;
     }
 
-    // 验证消息格式
+    // Validate message format
     const message = event.data as OverlayMessage;
     if (!message || message.type !== MESSAGE_TYPE) {
       return;
     }
 
-    // 处理不同的动作
+    // Handle different actions
     switch (message.action) {
       case 'init':
         this.handleInit(message.elements);
@@ -190,7 +190,7 @@ export class ReceiverSDK {
   }
 
   /**
-   * 处理初始化消息
+   * Handle init message
    */
   private handleInit(elements: ElementRect[]): void {
     for (const element of elements) {
@@ -200,7 +200,7 @@ export class ReceiverSDK {
   }
 
   /**
-   * 处理更新消息
+   * Handle update message
    */
   private handleUpdate(elements: ElementRect[]): void {
     for (const element of elements) {
@@ -210,7 +210,7 @@ export class ReceiverSDK {
   }
 
   /**
-   * 处理移除消息
+   * Handle remove message
    */
   private handleRemove(elements: ElementRect[]): void {
     const removed: ElementRect[] = [];
@@ -227,7 +227,7 @@ export class ReceiverSDK {
   }
 
   /**
-   * 触发事件
+   * Emit event
    */
   private emit(event: MessageAction, elements: ElementRect[]): void {
     const listeners = this.listeners.get(event);
