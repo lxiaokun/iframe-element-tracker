@@ -177,8 +177,14 @@ The data structure for tracked elements:
 
 ```typescript
 interface ElementRect {
-  id: string;                    // Unique identifier
+  id: string;                    // Unique tracker identifier
   timestamp: number;             // Last update timestamp
+
+  attributes: {
+    elementId: string;           // Element's id attribute
+    classList: string[];         // Element's class list
+    dataset: Record<string, string>; // Element's data-* attributes
+  };
 
   bounds: {
     x: number;                   // X position relative to iframe viewport
