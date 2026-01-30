@@ -177,8 +177,14 @@ new ReceiverSDK(iframe: HTMLIFrameElement, options?: ReceiverOptions)
 
 ```typescript
 interface ElementRect {
-  id: string;                    // 唯一标识符
+  id: string;                    // 唯一追踪标识符
   timestamp: number;             // 最后更新时间戳
+
+  attributes: {
+    elementId: string;           // 元素的 id 属性
+    classList: string[];         // 元素的 class 列表
+    dataset: Record<string, string>; // 元素的 data-* 属性
+  };
 
   bounds: {
     x: number;                   // 相对于 iframe 视口的 X 位置
