@@ -1,7 +1,7 @@
-import { TrackerSDK } from '../src/tracker';
+import { ElementTracker } from '../src/tracker';
 
-// Create TrackerSDK instance
-const tracker = new TrackerSDK();
+// Create ElementTracker instance
+const tracker = new ElementTracker();
 
 // Elements to track
 const elementsToTrack = [
@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  console.log('TrackerSDK initialized, tracking', elementsToTrack.length, 'elements');
+  console.log('ElementTracker initialized, tracking', elementsToTrack.length, 'elements');
 });
 
 // Expose to global for debugging

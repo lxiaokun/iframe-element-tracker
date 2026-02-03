@@ -43,7 +43,7 @@ export class OverlayPositioner {
    * Calculate the complete overlay style for an element.
    * This is the main convenience method for simple use cases.
    *
-   * @param elementRect - The tracked element data from ReceiverSDK
+   * @param elementRect - The tracked element data from ElementReceiver
    * @returns OverlayStyle ready to apply, or null if element is not visible
    */
   getOverlayStyle(elementRect: ElementRect): OverlayStyle | null {
@@ -82,7 +82,7 @@ export class OverlayPositioner {
    * Convenience method that handles visibility and style application.
    *
    * @param overlay - The overlay DOM element to style
-   * @param elementRect - The tracked element data from ReceiverSDK
+   * @param elementRect - The tracked element data from ElementReceiver
    */
   applyOverlayStyle(overlay: HTMLElement, elementRect: ElementRect): void {
     if (!elementRect.visibility.isVisible) {

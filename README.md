@@ -6,7 +6,7 @@ A SDK for tracking DOM elements inside iframes and synchronizing their position,
 
 ## Prerequisites
 
-**Important**: This SDK requires developers to have control over both the host page and the iframe content page (or at least be able to inject code into the iframe page), as TrackerSDK and ReceiverSDK need to be imported in both pages respectively.
+**Important**: This SDK requires developers to have control over both the host page and the iframe content page (or at least be able to inject code into the iframe page), as ElementTracker and ElementReceiver need to be imported in both pages respectively.
 
 ## Why This SDK?
 
@@ -64,12 +64,12 @@ npm install iframe-element-tracker
 
 ## Quick Start
 
-### Inside the iframe (TrackerSDK)
+### Inside the iframe (ElementTracker)
 
 ```typescript
-import { TrackerSDK } from 'iframe-element-tracker';
+import { ElementTracker } from 'iframe-element-tracker';
 
-const tracker = new TrackerSDK();
+const tracker = new ElementTracker();
 
 // Register elements to track
 tracker.register(document.getElementById('my-element'), 'my-element', {
@@ -83,13 +83,13 @@ tracker.unregister('my-element');
 tracker.destroy();
 ```
 
-### In the host page (ReceiverSDK)
+### In the host page (ElementReceiver)
 
 ```typescript
-import { ReceiverSDK } from 'iframe-element-tracker';
+import { ElementReceiver } from 'iframe-element-tracker';
 
 const iframe = document.getElementById('my-iframe') as HTMLIFrameElement;
-const receiver = new ReceiverSDK(iframe);
+const receiver = new ElementReceiver(iframe);
 
 // Listen for element initialization
 receiver.on('init', (elements) => {
@@ -130,12 +130,12 @@ When rendering overlays on the host page, you need to convert iframe coordinates
 - Overlay container offset (when container extends beyond iframe)
 
 ```typescript
-import { ReceiverSDK, OverlayPositioner } from 'iframe-element-tracker';
+import { ElementReceiver, OverlayPositioner } from 'iframe-element-tracker';
 
 const iframe = document.getElementById('my-iframe') as HTMLIFrameElement;
 const overlayContainer = document.getElementById('overlay-container');
 
-const receiver = new ReceiverSDK(iframe);
+const receiver = new ElementReceiver(iframe);
 const positioner = new OverlayPositioner({ iframe, container: overlayContainer });
 
 // Simple usage: apply style directly to overlay element
@@ -183,14 +183,14 @@ const borderRadius = positioner.scaleBorderRadius(styles.border.radius, context.
 
 ## API Reference
 
-### TrackerSDK
+### ElementTracker
 
-The TrackerSDK runs inside the iframe and tracks registered DOM elements.
+The ElementTracker runs inside the iframe and tracks registered DOM elements.
 
 #### Constructor
 
 ```typescript
-new TrackerSDK(options?: TrackerOptions)
+new ElementTracker(options?: TrackerOptions)
 ```
 
 **Options:**
@@ -207,14 +207,14 @@ new TrackerSDK(options?: TrackerOptions)
 | `forceUpdate()` | Manually trigger an update |
 | `destroy()` | Clean up all resources |
 
-### ReceiverSDK
+### ElementReceiver
 
-The ReceiverSDK runs in the host page and receives element data from the iframe.
+The ElementReceiver runs in the host page and receives element data from the iframe.
 
 #### Constructor
 
 ```typescript
-new ReceiverSDK(iframe: HTMLIFrameElement, options?: ReceiverOptions)
+new ElementReceiver(iframe: HTMLIFrameElement, options?: ReceiverOptions)
 ```
 
 **Options:**
