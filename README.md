@@ -130,14 +130,13 @@ When rendering overlays on the host page, you need to convert iframe coordinates
 - Overlay container offset (when container extends beyond iframe)
 
 ```typescript
-import { ReceiverSDK } from 'iframe-element-tracker';
+import { ReceiverSDK, OverlayPositioner } from 'iframe-element-tracker';
 
 const iframe = document.getElementById('my-iframe') as HTMLIFrameElement;
 const overlayContainer = document.getElementById('overlay-container');
-const receiver = new ReceiverSDK(iframe);
 
-// Create OverlayPositioner via factory method
-const positioner = receiver.createPositioner(overlayContainer);
+const receiver = new ReceiverSDK(iframe);
+const positioner = new OverlayPositioner({ iframe, container: overlayContainer });
 
 // Simple usage: apply style directly to overlay element
 receiver.on('update', (elements) => {
@@ -231,7 +230,6 @@ new ReceiverSDK(iframe: HTMLIFrameElement, options?: ReceiverOptions)
 | `getElement(id)` | Get a single element by ID |
 | `getIframe()` | Get the bound iframe element |
 | `getIframeBounds()` | Get iframe's bounding rect |
-| `createPositioner(container)` | Create an OverlayPositioner for rendering overlays |
 | `destroy()` | Clean up all resources |
 
 ### OverlayPositioner

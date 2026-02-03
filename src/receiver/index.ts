@@ -3,8 +3,6 @@ import {
   OverlayMessage,
   MessageAction,
   MESSAGE_TYPE,
-  OverlayPositioner,
-  OverlayPositionerOptions,
 } from '../shared';
 
 /**
@@ -96,64 +94,6 @@ export class ReceiverSDK {
    */
   getIframeBounds(): DOMRect {
     return this.iframe.getBoundingClientRect();
-  }
-
-  /**
-   * Transform iframe coordinates to host page coordinates
-   */
-  transformToHostCoordinates(
-    iframeX: number,
-    iframeY: number
-  ): { x: number; y: number } {
-    const iframeBounds = this.getIframeBounds();
-    return {
-      x: iframeBounds.x + iframeX,
-      y: iframeBounds.y + iframeY,
-    };
-  }
-
-  /**
-   * Get element bounds in host page coordinates
-   */
-  getElementHostBounds(id: string): {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  } | null {
-    const element = this.elements.get(id);
-    if (!element) {
-      return null;
-    }
-
-    const hostCoords = this.transformToHostCoordinates(
-      element.bounds.x,
-      element.bounds.y
-    );
-
-    return {
-      x: hostCoords.x,
-      y: hostCoords.y,
-      width: element.bounds.width,
-      height: element.bounds.height,
-    };
-  }
-
-  /**
-   * Create an OverlayPositioner instance configured for this receiver's iframe.
-   *
-   * @param container - The overlay container element
-   * @param options - Additional positioner options
-   */
-  createPositioner(
-    container: HTMLElement,
-    options?: Omit<OverlayPositionerOptions, 'iframe' | 'container'>
-  ): OverlayPositioner {
-    return new OverlayPositioner({
-      ...options,
-      iframe: this.iframe,
-      container,
-    });
   }
 
   /**
