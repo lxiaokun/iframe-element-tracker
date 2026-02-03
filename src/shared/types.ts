@@ -131,3 +131,73 @@ export interface OverlayMessage {
   /** Element information list */
   elements: ElementRect[];
 }
+
+// ==================== Overlay Positioner Types ====================
+
+/**
+ * 2D scale factor
+ */
+export interface Scale2D {
+  scaleX: number;
+  scaleY: number;
+}
+
+/**
+ * 2D offset (left/top)
+ */
+export interface Offset2D {
+  left: number;
+  top: number;
+}
+
+/**
+ * Complete overlay style output ready to apply to an element
+ */
+export interface OverlayStyle {
+  /** CSS left value in pixels */
+  left: number;
+  /** CSS top value in pixels */
+  top: number;
+  /** CSS width value in pixels */
+  width: number;
+  /** CSS height value in pixels */
+  height: number;
+  /** Scaled border-radius CSS string */
+  borderRadius: string;
+  /** Transform from tracked element (if any) */
+  transform: string | null;
+  /** Transform origin from tracked element */
+  transformOrigin: string;
+}
+
+/**
+ * Context containing all scale and offset values for coordinate transformation
+ */
+export interface ScaleContext {
+  /** Scale factor applied to iframe itself (transform + zoom combined) */
+  iframeScale: Scale2D;
+  /** Scale factor from iframe's CSS zoom only (affects margin) */
+  iframeZoom: Scale2D;
+  /** Scale factor from iframe's CSS transform only (does not affect margin) */
+  iframeTransform: Scale2D;
+  /** Scale factor from ancestor transforms/zoom */
+  ancestorScale: Scale2D;
+  /** Combined scale (iframe * ancestor) */
+  combinedScale: Scale2D;
+  /** Iframe's margin offset (outside iframe, scaled by zoom but not transform) */
+  iframeMargin: Offset2D;
+  /** Iframe's border + padding offset (inside iframe, scaled by combinedScale) */
+  iframeBorderPadding: Offset2D;
+  /** Container's CSS position offset */
+  containerOffset: Offset2D;
+}
+
+/**
+ * Configuration options for OverlayPositioner
+ */
+export interface OverlayPositionerOptions {
+  /** The overlay container element (where overlays are appended) */
+  container: HTMLElement;
+  /** The iframe element being tracked */
+  iframe: HTMLIFrameElement;
+}

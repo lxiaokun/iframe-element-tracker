@@ -3,6 +3,8 @@ import {
   OverlayMessage,
   MessageAction,
   MESSAGE_TYPE,
+  OverlayPositioner,
+  OverlayPositionerOptions,
 } from '../shared';
 
 /**
@@ -135,6 +137,23 @@ export class ReceiverSDK {
       width: element.bounds.width,
       height: element.bounds.height,
     };
+  }
+
+  /**
+   * Create an OverlayPositioner instance configured for this receiver's iframe.
+   *
+   * @param container - The overlay container element
+   * @param options - Additional positioner options
+   */
+  createPositioner(
+    container: HTMLElement,
+    options?: Omit<OverlayPositionerOptions, 'iframe' | 'container'>
+  ): OverlayPositioner {
+    return new OverlayPositioner({
+      ...options,
+      iframe: this.iframe,
+      container,
+    });
   }
 
   /**
