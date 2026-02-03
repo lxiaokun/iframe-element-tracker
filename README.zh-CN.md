@@ -120,6 +120,68 @@ const singleElement = receiver.getElement('my-element');
 receiver.destroy();
 ```
 
+### 渲染覆盖层 (OverlayPositioner)
+
+在宿主页面渲染覆盖层时，需要将 iframe 坐标转换为宿主页面坐标。`OverlayPositioner` 自动处理所有复杂的坐标变换，包括：
+
+- iframe 的 margin、border、padding
+- iframe 或祖先元素的 CSS `transform: scale()`
+- iframe 或祖先元素的 CSS `zoom`
+- 覆盖层容器偏移（当容器超出 iframe 边界时）
+
+```typescript
+import { ReceiverSDK } from 'iframe-element-tracker';
+
+const iframe = document.getElementById('my-iframe') as HTMLIFrameElement;
+const overlayContainer = document.getElementById('overlay-container');
+const receiver = new ReceiverSDK(iframe);
+
+// 通过工厂方法创建 OverlayPositioner
+const positioner = receiver.createPositioner(overlayContainer);
+
+// 简单用法：直接将样式应用到覆盖层元素
+receiver.on('update', (elements) => {
+  elements.forEach(el => {
+    const overlay = getOrCreateOverlay(el.id);
+    positioner.applyOverlayStyle(overlay, el);
+  });
+});
+
+// 或获取样式值手动应用
+receiver.on('update', (elements) => {
+  elements.forEach(el => {
+    const style = positioner.getOverlayStyle(el);
+    if (style) {
+      overlay.style.left = `${style.left}px`;
+      overlay.style.top = `${style.top}px`;
+      overlay.style.width = `${style.width}px`;
+      overlay.style.height = `${style.height}px`;
+      overlay.style.borderRadius = style.borderRadius;
+    }
+  });
+});
+```
+
+#### 进阶：底层 API
+
+对于自定义计算或优化场景，可以访问底层方法：
+
+```typescript
+// 获取所有缩放和偏移值
+const context = positioner.getScaleContext();
+// 返回: { iframeScale, iframeZoom, iframeTransform, ancestorScale,
+//         combinedScale, iframeMargin, iframeBorderPadding, containerOffset }
+
+// 手动转换坐标
+const position = positioner.transformCoordinates(bounds.x, bounds.y, context);
+
+// 手动转换尺寸
+const dimensions = positioner.transformDimensions(bounds.width, bounds.height, context);
+
+// 缩放 border-radius
+const borderRadius = positioner.scaleBorderRadius(styles.border.radius, context.iframeScale.scaleX);
+```
+
 ## API 参考
 
 ### TrackerSDK
@@ -169,7 +231,36 @@ new ReceiverSDK(iframe: HTMLIFrameElement, options?: ReceiverOptions)
 | `getElement(id)` | 根据 ID 获取单个元素 |
 | `getIframe()` | 获取绑定的 iframe 元素 |
 | `getIframeBounds()` | 获取 iframe 的边界矩形 |
+| `createPositioner(container)` | 创建用于渲染覆盖层的 OverlayPositioner |
 | `destroy()` | 清理所有资源 |
+
+### OverlayPositioner
+
+处理覆盖层定位的坐标变换。自动处理 iframe 的 margin、border、padding、transform、zoom 以及覆盖层容器偏移。
+
+#### 构造函数
+
+```typescript
+new OverlayPositioner(options: OverlayPositionerOptions)
+```
+
+**配置项：**
+- `iframe: HTMLIFrameElement` - iframe 元素
+- `container: HTMLElement` - 覆盖层容器元素
+
+#### 方法
+
+| 方法 | 描述 |
+|------|------|
+| `applyOverlayStyle(overlay, elementRect)` | 直接将计算好的样式应用到覆盖层元素 |
+| `getOverlayStyle(elementRect)` | 获取计算好的样式值（返回 `OverlayStyle \| null`） |
+| `getScaleContext()` | 获取所有缩放和偏移值，用于自定义计算 |
+| `transformCoordinates(x, y, context?)` | 将 iframe 坐标转换为 CSS left/top |
+| `transformDimensions(width, height, context?)` | 将尺寸转换为 CSS width/height |
+| `scaleBorderRadius(radius, scale)` | 缩放 border-radius 值 |
+| `getIframeScale()` | 获取 iframe 的 transform/zoom 合并缩放比例 |
+| `getIframeScaleSeparate()` | 分别获取 iframe 的 zoom 和 transform 缩放比例 |
+| `getAncestorScale()` | 获取祖先元素的累积缩放比例 |
 
 ### ElementRect
 

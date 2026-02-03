@@ -108,3 +108,13 @@ After making changes:
 4. Test different overlay modes (Passthrough, Interactive, Labeled, Rich)
 5. Verify overlays align correctly with tracked elements
 6. Check that overlays can extend beyond iframe boundaries (in Labeled/Rich modes)
+
+## Debugging Guidelines
+
+When using Chrome DevTools MCP for debugging:
+- **Do NOT use screenshots** - rely on code analysis and DevTools inspection instead
+- Use `take_snapshot` to get the DOM structure (a11y tree)
+- Use `evaluate_script` to execute JavaScript for checking element properties, computed styles, coordinates, etc.
+- Use `list_console_messages` to view console output
+- Use `list_network_requests` to inspect network requests
+- Combine with code analysis to locate issues

@@ -1,4 +1,5 @@
 import { ReceiverSDK } from '../src/receiver';
+import { OverlayPositioner } from '../src/overlay-positioner';
 import type { ElementRect } from '../src/shared';
 
 // Overlay rendering mode
@@ -6,29 +7,12 @@ type OverlayMode = 'passthrough' | 'interactive' | 'labeled' | 'rich';
 
 let currentMode: OverlayMode = 'passthrough';
 let receiver: ReceiverSDK | null = null;
+let positioner: OverlayPositioner | null = null;
 
 // DOM element references
 const iframe = document.getElementById('inner-frame') as HTMLIFrameElement;
 const overlayContainer = document.getElementById('overlay-container')!;
 const statusContent = document.getElementById('status-content')!;
-
-// Get iframe border width (for coordinate offset correction)
-function getIframeBorderOffset(): { left: number; top: number } {
-  const style = window.getComputedStyle(iframe);
-  return {
-    left: parseFloat(style.borderLeftWidth) || 0,
-    top: parseFloat(style.borderTopWidth) || 0,
-  };
-}
-
-// Get overlay container offset relative to iframe
-function getContainerOffset(): { left: number; top: number } {
-  const containerStyle = window.getComputedStyle(overlayContainer);
-  return {
-    left: parseFloat(containerStyle.left) || 0,
-    top: parseFloat(containerStyle.top) || 0,
-  };
-}
 
 // Mode switch buttons
 const modeButtons = {
@@ -46,6 +30,9 @@ const overlayElements: Map<string, HTMLElement> = new Map();
  */
 function initReceiver() {
   receiver = new ReceiverSDK(iframe);
+
+  // Create OverlayPositioner via factory method
+  positioner = receiver.createPositioner(overlayContainer);
 
   receiver.on('init', (elements) => {
     console.log('Received init:', elements);
@@ -94,7 +81,7 @@ function updateOverlay(elementRect: ElementRect) {
  * Update overlay style and position
  */
 function updateOverlayStyle(overlay: HTMLElement, elementRect: ElementRect) {
-  const { bounds, visibility, styles } = elementRect;
+  const { visibility } = elementRect;
   const metadata = elementRect.metadata as { label?: string } | undefined;
 
   // Hide overlay if element is not visible
@@ -105,29 +92,9 @@ function updateOverlayStyle(overlay: HTMLElement, elementRect: ElementRect) {
 
   overlay.style.display = 'block';
 
-  // Get iframe border offset for coordinate correction
-  const borderOffset = getIframeBorderOffset();
-  // Get container offset relative to iframe-wrapper (container may be larger than iframe)
-  const containerOffset = getContainerOffset();
-
-  // Set position and size
-  // bounds.x/y are coordinates within the iframe
-  // + borderOffset compensates for iframe border
-  // - containerOffset compensates for container's negative offset
-  overlay.style.left = `${bounds.x + borderOffset.left - containerOffset.left}px`;
-  overlay.style.top = `${bounds.y + borderOffset.top - containerOffset.top}px`;
-  overlay.style.width = `${bounds.width}px`;
-  overlay.style.height = `${bounds.height}px`;
-
-  // Apply border-radius
-  overlay.style.borderRadius = `${styles.border.radius.topLeft} ${styles.border.radius.topRight} ${styles.border.radius.bottomRight} ${styles.border.radius.bottomLeft}`;
-
-  // Apply transform
-  if (styles.transform) {
-    overlay.style.transform = styles.transform;
-    overlay.style.transformOrigin = styles.transformOrigin;
-  } else {
-    overlay.style.transform = '';
+  // Use OverlayPositioner to apply position and size
+  if (positioner) {
+    positioner.applyOverlayStyle(overlay, elementRect);
   }
 
   // Set class name and content based on mode
@@ -254,32 +221,89 @@ function setMode(mode: OverlayMode) {
   }
 }
 
-/**
- * Re-render all overlays (when mode switches)
- */
-function rerenderOverlays() {
-  if (!receiver) return;
-
-  receiver.getElements().forEach((el) => {
-    const overlay = overlayElements.get(el.id);
-    if (overlay) {
-      const metadata = el.metadata as { label?: string } | undefined;
-      applyOverlayMode(overlay, el, metadata?.label);
-    }
-  });
-}
-
-// Bindmode switch button events
+// Bind mode switch button events
 Object.entries(modeButtons).forEach(([mode, btn]) => {
   btn.addEventListener('click', () => setMode(mode as OverlayMode));
+});
+
+// Test buttons for iframe styles
+const testButtons = {
+  margin: document.getElementById('test-margin')!,
+  padding: document.getElementById('test-padding')!,
+  transform: document.getElementById('test-transform')!,
+  zoom: document.getElementById('test-zoom')!,
+  reset: document.getElementById('test-reset')!,
+};
+
+// Track active test states
+const testStates = {
+  margin: false,
+  padding: false,
+  transform: false,
+  zoom: false,
+};
+
+function updateTestButtonStates() {
+  testButtons.margin.classList.toggle('active', testStates.margin);
+  testButtons.padding.classList.toggle('active', testStates.padding);
+  testButtons.transform.classList.toggle('active', testStates.transform);
+  testButtons.zoom.classList.toggle('active', testStates.zoom);
+}
+
+function applyTestStyles() {
+  iframe.style.margin = testStates.margin ? '20px' : '';
+  iframe.style.padding = testStates.padding ? '15px' : '';
+  iframe.style.transform = testStates.transform ? 'scale(0.8)' : '';
+  iframe.style.transformOrigin = testStates.transform ? 'top left' : '';
+  iframe.style.zoom = testStates.zoom ? '0.8' : '';
+
+  // Force update overlays
+  if (iframe.contentWindow && (iframe.contentWindow as any).tracker) {
+    (iframe.contentWindow as any).tracker.forceUpdate();
+  }
+}
+
+testButtons.margin.addEventListener('click', () => {
+  testStates.margin = !testStates.margin;
+  updateTestButtonStates();
+  applyTestStyles();
+});
+
+testButtons.padding.addEventListener('click', () => {
+  testStates.padding = !testStates.padding;
+  updateTestButtonStates();
+  applyTestStyles();
+});
+
+testButtons.transform.addEventListener('click', () => {
+  testStates.transform = !testStates.transform;
+  updateTestButtonStates();
+  applyTestStyles();
+});
+
+testButtons.zoom.addEventListener('click', () => {
+  testStates.zoom = !testStates.zoom;
+  updateTestButtonStates();
+  applyTestStyles();
+});
+
+testButtons.reset.addEventListener('click', () => {
+  testStates.margin = false;
+  testStates.padding = false;
+  testStates.transform = false;
+  testStates.zoom = false;
+  updateTestButtonStates();
+  applyTestStyles();
 });
 
 // Initialize after iframe loads
 iframe.addEventListener('load', () => {
   console.log('iframe loaded, initializing ReceiverSDK');
   initReceiver();
+
+  // Expose to global for debugging (after initialization)
+  (window as any).receiver = receiver;
+  (window as any).positioner = positioner;
 });
 
-// Expose to global for debugging
-(window as any).receiver = receiver;
 (window as any).setMode = setMode;

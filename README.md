@@ -120,6 +120,68 @@ const singleElement = receiver.getElement('my-element');
 receiver.destroy();
 ```
 
+### Rendering Overlays (OverlayPositioner)
+
+When rendering overlays on the host page, you need to convert iframe coordinates to host page coordinates. The `OverlayPositioner` handles all the complex coordinate transformations automatically, including:
+
+- iframe margin, border, and padding
+- CSS `transform: scale()` on iframe or ancestors
+- CSS `zoom` on iframe or ancestors
+- Overlay container offset (when container extends beyond iframe)
+
+```typescript
+import { ReceiverSDK } from 'iframe-element-tracker';
+
+const iframe = document.getElementById('my-iframe') as HTMLIFrameElement;
+const overlayContainer = document.getElementById('overlay-container');
+const receiver = new ReceiverSDK(iframe);
+
+// Create OverlayPositioner via factory method
+const positioner = receiver.createPositioner(overlayContainer);
+
+// Simple usage: apply style directly to overlay element
+receiver.on('update', (elements) => {
+  elements.forEach(el => {
+    const overlay = getOrCreateOverlay(el.id);
+    positioner.applyOverlayStyle(overlay, el);
+  });
+});
+
+// Or get style values to apply manually
+receiver.on('update', (elements) => {
+  elements.forEach(el => {
+    const style = positioner.getOverlayStyle(el);
+    if (style) {
+      overlay.style.left = `${style.left}px`;
+      overlay.style.top = `${style.top}px`;
+      overlay.style.width = `${style.width}px`;
+      overlay.style.height = `${style.height}px`;
+      overlay.style.borderRadius = style.borderRadius;
+    }
+  });
+});
+```
+
+#### Advanced: Low-level API
+
+For custom calculations or optimization, you can access the low-level methods:
+
+```typescript
+// Get all scale and offset values
+const context = positioner.getScaleContext();
+// Returns: { iframeScale, iframeZoom, iframeTransform, ancestorScale,
+//            combinedScale, iframeMargin, iframeBorderPadding, containerOffset }
+
+// Transform coordinates manually
+const position = positioner.transformCoordinates(bounds.x, bounds.y, context);
+
+// Transform dimensions manually
+const dimensions = positioner.transformDimensions(bounds.width, bounds.height, context);
+
+// Scale border-radius
+const borderRadius = positioner.scaleBorderRadius(styles.border.radius, context.iframeScale.scaleX);
+```
+
 ## API Reference
 
 ### TrackerSDK
@@ -169,7 +231,36 @@ new ReceiverSDK(iframe: HTMLIFrameElement, options?: ReceiverOptions)
 | `getElement(id)` | Get a single element by ID |
 | `getIframe()` | Get the bound iframe element |
 | `getIframeBounds()` | Get iframe's bounding rect |
+| `createPositioner(container)` | Create an OverlayPositioner for rendering overlays |
 | `destroy()` | Clean up all resources |
+
+### OverlayPositioner
+
+Handles coordinate transformation for overlay positioning. Automatically accounts for iframe's margin, border, padding, transform, zoom, and overlay container offset.
+
+#### Constructor
+
+```typescript
+new OverlayPositioner(options: OverlayPositionerOptions)
+```
+
+**Options:**
+- `iframe: HTMLIFrameElement` - The iframe element
+- `container: HTMLElement` - The overlay container element
+
+#### Methods
+
+| Method | Description |
+|--------|-------------|
+| `applyOverlayStyle(overlay, elementRect)` | Apply calculated style directly to overlay element |
+| `getOverlayStyle(elementRect)` | Get calculated style values (returns `OverlayStyle \| null`) |
+| `getScaleContext()` | Get all scale and offset values for custom calculations |
+| `transformCoordinates(x, y, context?)` | Transform iframe coordinates to CSS left/top |
+| `transformDimensions(width, height, context?)` | Transform dimensions to CSS width/height |
+| `scaleBorderRadius(radius, scale)` | Scale border-radius values |
+| `getIframeScale()` | Get iframe's combined transform/zoom scale |
+| `getIframeScaleSeparate()` | Get iframe's zoom and transform scales separately |
+| `getAncestorScale()` | Get cumulative scale from ancestor elements |
 
 ### ElementRect
 
