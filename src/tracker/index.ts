@@ -5,7 +5,7 @@ import {
   ElementAttributes,
   Bounds,
   Spacing,
-  OverlayMessage,
+  TrackerMessage,
   MESSAGE_TYPE,
   DEFAULT_THROTTLE_DELAY,
 } from '../shared';
@@ -19,7 +19,7 @@ export interface RegisterOptions {
 }
 
 /**
- * TrackerSDK configuration options
+ * ElementTracker configuration options
  */
 export interface TrackerOptions {
   /** Target window, defaults to window.parent */
@@ -41,10 +41,10 @@ interface TrackedElement {
 }
 
 /**
- * TrackerSDK - Used inside iframe pages
+ * ElementTracker - Used inside iframe pages
  * Registers and tracks DOM element position, size, and style changes
  */
-export class TrackerSDK {
+export class ElementTracker {
   private trackedElements: Map<string, TrackedElement> = new Map();
   private targetWindow: Window;
   private targetOrigin: string;
@@ -96,7 +96,7 @@ export class TrackerSDK {
    */
   register(element: Element, id: string, options: RegisterOptions = {}): void {
     if (this.isDestroyed) {
-      console.warn('TrackerSDK has been destroyed');
+      console.warn('ElementTracker has been destroyed');
       return;
     }
 
@@ -441,8 +441,8 @@ export class TrackerSDK {
   /**
    * Send update message to host page
    */
-  private sendUpdate(action: OverlayMessage['action'], elements: ElementRect[]): void {
-    const message: OverlayMessage = {
+  private sendUpdate(action: TrackerMessage['action'], elements: ElementRect[]): void {
+    const message: TrackerMessage = {
       type: MESSAGE_TYPE,
       action,
       elements,
@@ -456,4 +456,4 @@ export class TrackerSDK {
   }
 }
 
-export default TrackerSDK;
+export default ElementTracker;

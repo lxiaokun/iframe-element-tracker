@@ -1,6 +1,6 @@
 import {
   ElementRect,
-  OverlayMessage,
+  TrackerMessage,
   MessageAction,
   MESSAGE_TYPE,
 } from '../shared';
@@ -11,7 +11,7 @@ import {
 export type EventCallback = (elements: ElementRect[]) => void;
 
 /**
- * ReceiverSDK configuration options
+ * ElementReceiver configuration options
  */
 export interface ReceiverOptions {
   /** Allowed origin, defaults to '*' (accept all origins) */
@@ -19,10 +19,10 @@ export interface ReceiverOptions {
 }
 
 /**
- * ReceiverSDK - Used in host pages
+ * ElementReceiver - Used in host pages
  * Receives element tracking information sent from iframe pages
  */
-export class ReceiverSDK {
+export class ElementReceiver {
   private iframe: HTMLIFrameElement;
   private allowedOrigin: string;
   private elements: Map<string, ElementRect> = new Map();
@@ -129,7 +129,7 @@ export class ReceiverSDK {
     }
 
     // Validate message format
-    const message = event.data as OverlayMessage;
+    const message = event.data as TrackerMessage;
     if (!message || message.type !== MESSAGE_TYPE) {
       return;
     }
@@ -202,4 +202,4 @@ export class ReceiverSDK {
   }
 }
 
-export default ReceiverSDK;
+export default ElementReceiver;

@@ -6,7 +6,7 @@
 
 ## 使用前提
 
-**重要**：使用本 SDK 需要开发者同时能够控制宿主页面和 iframe 内容页面的代码（或至少能够向 iframe 页面注入代码），因为需要在两个页面中分别引入 TrackerSDK 和 ReceiverSDK。
+**重要**：使用本 SDK 需要开发者同时能够控制宿主页面和 iframe 内容页面的代码（或至少能够向 iframe 页面注入代码），因为需要在两个页面中分别引入 ElementTracker 和 ElementReceiver。
 
 ## 核心问题
 
@@ -29,7 +29,7 @@
 │          Host Page (宿主页面)                │
 │                                             │
 │  ┌──────────────────────────────────┐      │
-│  │     ReceiverSDK (数据层)         │      │
+│  │     ElementReceiver (数据层)         │      │
 │  │  - 监听 postMessage              │      │
 │  │  - 管理元素状态                  │      │
 │  │  - 提供事件回调                  │      │
@@ -46,7 +46,7 @@
 │  │  <iframe>                     │         │
 │  │                               │         │
 │  │  ┌─────────────────────────┐ │         │
-│  │  │  TrackerSDK (追踪层)    │ │         │
+│  │  │  ElementTracker (追踪层)    │ │         │
 │  │  │  - 注册元素             │ │         │
 │  │  │  - 追踪变化             │ │         │
 │  │  │  - 发送 postMessage     │ │         │
@@ -165,10 +165,10 @@ interface Spacing {
 
 ## SDK API 设计
 
-### TrackerSDK (iframe 内部)
+### ElementTracker (iframe 内部)
 
 ```typescript
-class TrackerSDK {
+class ElementTracker {
   /**
    * 注册需要追踪的元素
    * @param element - DOM 元素或选择器
@@ -199,10 +199,10 @@ class TrackerSDK {
 }
 ```
 
-### ReceiverSDK (宿主页面)
+### ElementReceiver (宿主页面)
 
 ```typescript
-class ReceiverSDK {
+class ElementReceiver {
   /**
    * 构造函数
    * @param iframe - iframe DOM 元素
@@ -242,7 +242,7 @@ class ReceiverSDK {
 
 ### 事件系统
 
-ReceiverSDK 提供三种事件：
+ElementReceiver 提供三种事件：
 
 1. **init**: iframe 加载完成后，初始化所有已注册的元素
 2. **update**: 元素位置、尺寸、样式发生变化
@@ -350,13 +350,13 @@ ReceiverSDK 提供三种事件：
 ### 消息类型
 
 ```typescript
-// TrackerSDK → ReceiverSDK
+// ElementTracker → ElementReceiver
 type TrackerMessage =
   | { type: 'INIT'; elements: ElementRect[] }
   | { type: 'UPDATE'; elements: ElementRect[] }
   | { type: 'REMOVE'; elements: { id: string }[] };
 
-// 可扩展：ReceiverSDK → TrackerSDK (未来可能需要)
+// 可扩展：ElementReceiver → ElementTracker (未来可能需要)
 type ReceiverMessage =
   | { type: 'PING' }
   | { type: 'REQUEST_UPDATE' };
@@ -364,7 +364,7 @@ type ReceiverMessage =
 
 ### 安全性考虑
 
-1. **源验证**：ReceiverSDK 验证 postMessage 来源
+1. **源验证**：ElementReceiver 验证 postMessage 来源
 2. **消息类型检查**：验证消息格式是否符合协议
 3. **错误处理**：优雅处理通信失败和格式错误
 
@@ -393,9 +393,9 @@ iframe-overlay/
 │   │   ├── constants.ts       # 常量（消息类型等）
 │   │   └── utils.ts           # 工具函数
 │   ├── tracker/
-│   │   └── index.ts           # TrackerSDK 实现
+│   │   └── index.ts           # ElementTracker 实现
 │   └── receiver/
-│       └── index.ts           # ReceiverSDK 实现
+│       └── index.ts           # ElementReceiver 实现
 ├── demo/
 │   ├── host.html              # 宿主页面
 │   ├── host.ts                # 宿主页面逻辑（含 overlay 渲染）
@@ -412,9 +412,9 @@ iframe-overlay/
 ### iframe 内部 (inner.html)
 
 ```typescript
-import { TrackerSDK } from '../src/tracker';
+import { ElementTracker } from '../src/tracker';
 
-const tracker = new TrackerSDK();
+const tracker = new ElementTracker();
 
 // 注册元素
 tracker.register('#button1', {
@@ -429,10 +429,10 @@ tracker.register('.card', {
 ### 宿主页面 (host.html)
 
 ```typescript
-import { ReceiverSDK } from '../src/receiver';
+import { ElementReceiver } from '../src/receiver';
 
 const iframe = document.getElementById('inner-frame');
-const receiver = new ReceiverSDK(iframe);
+const receiver = new ElementReceiver(iframe);
 
 // 监听初始化
 receiver.on('init', (elements) => {

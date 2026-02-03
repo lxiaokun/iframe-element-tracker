@@ -1,4 +1,4 @@
-import { ReceiverSDK } from '../src/receiver';
+import { ElementReceiver } from '../src/receiver';
 import { OverlayPositioner } from '../src/overlay-positioner';
 import type { ElementRect } from '../src/shared';
 
@@ -6,7 +6,7 @@ import type { ElementRect } from '../src/shared';
 type OverlayMode = 'passthrough' | 'interactive' | 'labeled' | 'rich';
 
 let currentMode: OverlayMode = 'passthrough';
-let receiver: ReceiverSDK | null = null;
+let receiver: ElementReceiver | null = null;
 let positioner: OverlayPositioner | null = null;
 
 // DOM element references
@@ -26,10 +26,10 @@ const modeButtons = {
 const overlayElements: Map<string, HTMLElement> = new Map();
 
 /**
- * Initialize ReceiverSDK
+ * Initialize ElementReceiver
  */
 function initReceiver() {
-  receiver = new ReceiverSDK(iframe);
+  receiver = new ElementReceiver(iframe);
 
   // Create OverlayPositioner independently
   positioner = new OverlayPositioner({ iframe, container: overlayContainer });
@@ -298,7 +298,7 @@ testButtons.reset.addEventListener('click', () => {
 
 // Initialize after iframe loads
 iframe.addEventListener('load', () => {
-  console.log('iframe loaded, initializing ReceiverSDK');
+  console.log('iframe loaded, initializing ElementReceiver');
   initReceiver();
 
   // Expose to global for debugging (after initialization)

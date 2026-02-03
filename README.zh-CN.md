@@ -6,7 +6,7 @@
 
 ## 使用前提
 
-**重要**：使用本 SDK 需要开发者同时能够控制宿主页面和 iframe 内容页面的代码（或至少能够向 iframe 页面注入代码），因为需要在两个页面中分别引入 TrackerSDK 和 ReceiverSDK。
+**重要**：使用本 SDK 需要开发者同时能够控制宿主页面和 iframe 内容页面的代码（或至少能够向 iframe 页面注入代码），因为需要在两个页面中分别引入 ElementTracker 和 ElementReceiver。
 
 ## 为什么需要这个 SDK？
 
@@ -64,12 +64,12 @@ npm install iframe-element-tracker
 
 ## 快速开始
 
-### iframe 内部 (TrackerSDK)
+### iframe 内部 (ElementTracker)
 
 ```typescript
-import { TrackerSDK } from 'iframe-element-tracker';
+import { ElementTracker } from 'iframe-element-tracker';
 
-const tracker = new TrackerSDK();
+const tracker = new ElementTracker();
 
 // 注册需要追踪的元素
 tracker.register(document.getElementById('my-element'), 'my-element', {
@@ -83,13 +83,13 @@ tracker.unregister('my-element');
 tracker.destroy();
 ```
 
-### 宿主页面 (ReceiverSDK)
+### 宿主页面 (ElementReceiver)
 
 ```typescript
-import { ReceiverSDK } from 'iframe-element-tracker';
+import { ElementReceiver } from 'iframe-element-tracker';
 
 const iframe = document.getElementById('my-iframe') as HTMLIFrameElement;
-const receiver = new ReceiverSDK(iframe);
+const receiver = new ElementReceiver(iframe);
 
 // 监听元素初始化
 receiver.on('init', (elements) => {
@@ -130,12 +130,12 @@ receiver.destroy();
 - 覆盖层容器偏移（当容器超出 iframe 边界时）
 
 ```typescript
-import { ReceiverSDK, OverlayPositioner } from 'iframe-element-tracker';
+import { ElementReceiver, OverlayPositioner } from 'iframe-element-tracker';
 
 const iframe = document.getElementById('my-iframe') as HTMLIFrameElement;
 const overlayContainer = document.getElementById('overlay-container');
 
-const receiver = new ReceiverSDK(iframe);
+const receiver = new ElementReceiver(iframe);
 const positioner = new OverlayPositioner({ iframe, container: overlayContainer });
 
 // 简单用法：直接将样式应用到覆盖层元素
@@ -183,14 +183,14 @@ const borderRadius = positioner.scaleBorderRadius(styles.border.radius, context.
 
 ## API 参考
 
-### TrackerSDK
+### ElementTracker
 
-TrackerSDK 运行在 iframe 内部，负责追踪已注册的 DOM 元素。
+ElementTracker 运行在 iframe 内部，负责追踪已注册的 DOM 元素。
 
 #### 构造函数
 
 ```typescript
-new TrackerSDK(options?: TrackerOptions)
+new ElementTracker(options?: TrackerOptions)
 ```
 
 **配置项：**
@@ -207,14 +207,14 @@ new TrackerSDK(options?: TrackerOptions)
 | `forceUpdate()` | 手动触发更新 |
 | `destroy()` | 清理所有资源 |
 
-### ReceiverSDK
+### ElementReceiver
 
-ReceiverSDK 运行在宿主页面，接收来自 iframe 的元素数据。
+ElementReceiver 运行在宿主页面，接收来自 iframe 的元素数据。
 
 #### 构造函数
 
 ```typescript
-new ReceiverSDK(iframe: HTMLIFrameElement, options?: ReceiverOptions)
+new ElementReceiver(iframe: HTMLIFrameElement, options?: ReceiverOptions)
 ```
 
 **配置项：**

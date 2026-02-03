@@ -8,8 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Key Concepts
 
-- **TrackerSDK**: Runs inside the iframe, registers and tracks DOM elements
-- **ReceiverSDK**: Runs in the host page, receives element data and emits events
+- **ElementTracker**: Runs inside the iframe, registers and tracks DOM elements
+- **ElementReceiver**: Runs in the host page, receives element data and emits events
 - **ElementRect**: The data structure containing all tracked element information (bounds, visibility, styles, attributes, etc.)
 
 ### Prerequisites
@@ -25,9 +25,9 @@ iframe-element-tracker/
 │   │   ├── types.ts      # ElementRect, ElementAttributes, etc.
 │   │   ├── constants.ts  # MESSAGE_TYPE, throttle delay
 │   │   └── index.ts      # Re-exports
-│   ├── tracker/          # TrackerSDK (iframe side)
+│   ├── tracker/          # ElementTracker (iframe side)
 │   │   └── index.ts
-│   └── receiver/         # ReceiverSDK (host side)
+│   └── receiver/         # ElementReceiver (host side)
 │       └── index.ts
 ├── demo/                 # Demo pages showing overlay rendering
 │   ├── host.html         # Host page with overlay container
@@ -61,10 +61,10 @@ The dev server runs at http://localhost:3000, demo page at http://localhost:3000
 
 ### Communication Flow
 
-1. TrackerSDK registers elements and observes changes (ResizeObserver, IntersectionObserver, scroll/resize events)
-2. On change, TrackerSDK sends ElementRect data via `postMessage` to parent window
-3. ReceiverSDK listens for messages, validates source, updates internal state
-4. ReceiverSDK emits events ('init', 'update', 'remove') that host page can subscribe to
+1. ElementTracker registers elements and observes changes (ResizeObserver, IntersectionObserver, scroll/resize events)
+2. On change, ElementTracker sends ElementRect data via `postMessage` to parent window
+3. ElementReceiver listens for messages, validates source, updates internal state
+4. ElementReceiver emits events ('init', 'update', 'remove') that host page can subscribe to
 
 ### Coordinate System
 
@@ -104,8 +104,8 @@ After completing a feature, always follow these steps in order:
 ## Key Files to Understand
 
 - `src/shared/types.ts` - All TypeScript interfaces (ElementRect, ElementAttributes, ElementStyles, etc.)
-- `src/tracker/index.ts` - TrackerSDK implementation with observers and update logic
-- `src/receiver/index.ts` - ReceiverSDK implementation with event system
+- `src/tracker/index.ts` - ElementTracker implementation with observers and update logic
+- `src/receiver/index.ts` - ElementReceiver implementation with event system
 - `demo/host.ts` - Example of how to render overlays based on tracked element data
 
 ## Testing Changes

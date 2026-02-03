@@ -123,7 +123,7 @@ export type MessageAction = 'init' | 'update' | 'remove';
 /**
  * Message structure from iframe to host page
  */
-export interface OverlayMessage {
+export interface TrackerMessage {
   /** Message type identifier */
   type: string;
   /** Action type */
