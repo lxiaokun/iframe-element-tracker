@@ -130,14 +130,13 @@ receiver.destroy();
 - 覆盖层容器偏移（当容器超出 iframe 边界时）
 
 ```typescript
-import { ReceiverSDK } from 'iframe-element-tracker';
+import { ReceiverSDK, OverlayPositioner } from 'iframe-element-tracker';
 
 const iframe = document.getElementById('my-iframe') as HTMLIFrameElement;
 const overlayContainer = document.getElementById('overlay-container');
-const receiver = new ReceiverSDK(iframe);
 
-// 通过工厂方法创建 OverlayPositioner
-const positioner = receiver.createPositioner(overlayContainer);
+const receiver = new ReceiverSDK(iframe);
+const positioner = new OverlayPositioner({ iframe, container: overlayContainer });
 
 // 简单用法：直接将样式应用到覆盖层元素
 receiver.on('update', (elements) => {
@@ -231,7 +230,6 @@ new ReceiverSDK(iframe: HTMLIFrameElement, options?: ReceiverOptions)
 | `getElement(id)` | 根据 ID 获取单个元素 |
 | `getIframe()` | 获取绑定的 iframe 元素 |
 | `getIframeBounds()` | 获取 iframe 的边界矩形 |
-| `createPositioner(container)` | 创建用于渲染覆盖层的 OverlayPositioner |
 | `destroy()` | 清理所有资源 |
 
 ### OverlayPositioner

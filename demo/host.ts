@@ -31,8 +31,8 @@ const overlayElements: Map<string, HTMLElement> = new Map();
 function initReceiver() {
   receiver = new ReceiverSDK(iframe);
 
-  // Create OverlayPositioner via factory method
-  positioner = receiver.createPositioner(overlayContainer);
+  // Create OverlayPositioner independently
+  positioner = new OverlayPositioner({ iframe, container: overlayContainer });
 
   receiver.on('init', (elements) => {
     console.log('Received init:', elements);
