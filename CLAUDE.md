@@ -92,6 +92,15 @@ For elements with CSS transforms:
   - `docs(scope): description` - Documentation
   - `refactor(scope): description` - Code refactoring
 
+## Development Workflow
+
+After completing a feature, always follow these steps in order:
+
+1. **Run tests** - Verify functionality works correctly in the demo page
+2. **Run and fix lint errors** - Execute `npx tsc --noEmit` and fix any type errors
+3. **Update documentation** - Update README.md and README.zh-CN.md if API changes
+4. **Commit code** - Use Conventional Commits format
+
 ## Key Files to Understand
 
 - `src/shared/types.ts` - All TypeScript interfaces (ElementRect, ElementAttributes, ElementStyles, etc.)
