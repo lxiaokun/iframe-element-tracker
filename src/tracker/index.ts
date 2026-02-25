@@ -27,6 +27,8 @@ export interface TrackerOptions {
   targetOrigin?: string;
   /** Throttle delay in milliseconds, defaults to 16ms */
   throttleDelay?: number;
+  /** Direct message callback, bypasses postMessage when provided */
+  onMessage?: (message: TrackerMessage) => void;
 }
 
 /**
@@ -51,12 +53,14 @@ export class ElementTracker {
   private intersectionObserver: IntersectionObserver;
   private scrollHandler: () => void;
   private resizeHandler: () => void;
+  private onMessage: ((message: TrackerMessage) => void) | null;
   private pendingUpdate: number | null = null;
   private isDestroyed = false;
 
   constructor(options: TrackerOptions = {}) {
     this.targetWindow = options.targetWindow ?? window.parent;
     this.targetOrigin = options.targetOrigin ?? '*';
+    this.onMessage = options.onMessage ?? null;
 
     // Create ResizeObserver to monitor element size changes
     this.resizeObserver = new ResizeObserver(() => {
@@ -444,6 +448,15 @@ export class ElementTracker {
       action,
       elements,
     };
+
+    if (this.onMessage) {
+      try {
+        this.onMessage(message);
+      } catch (error) {
+        console.error('Error in onMessage callback:', error);
+      }
+      return;
+    }
 
     try {
       this.targetWindow.postMessage(message, this.targetOrigin);

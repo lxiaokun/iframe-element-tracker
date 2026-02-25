@@ -309,3 +309,117 @@ describe('ElementReceiver', () => {
     });
   });
 });
+
+// ==================== Same-page mode ====================
+
+describe('ElementReceiver (same-page mode)', () => {
+  let receiver: ElementReceiver;
+
+  beforeEach(() => {
+    receiver = new ElementReceiver(null);
+  });
+
+  afterEach(() => {
+    receiver.destroy();
+  });
+
+  describe('constructor without iframe', () => {
+    it('creates receiver without iframe', () => {
+      expect(receiver.getIframe()).toBeNull();
+    });
+
+    it('getIframeBounds returns null when no iframe', () => {
+      expect(receiver.getIframeBounds()).toBeNull();
+    });
+
+    it('does not listen for window message events', () => {
+      const callback = vi.fn();
+      receiver.on('init', callback);
+
+      // Dispatch a message event — it should NOT be handled
+      const event = new MessageEvent('message', {
+        data: createTrackerMessage('init', [createElementRect()]),
+        source: window,
+        origin: 'http://localhost',
+      });
+      window.dispatchEvent(event);
+
+      expect(callback).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleTrackerMessage', () => {
+    it('handles init messages', () => {
+      const callback = vi.fn();
+      receiver.on('init', callback);
+
+      const elements = [createElementRect({ id: 'el-1' }), createElementRect({ id: 'el-2' })];
+      receiver.handleTrackerMessage(createTrackerMessage('init', elements));
+
+      expect(callback).toHaveBeenCalledOnce();
+      expect(callback).toHaveBeenCalledWith(elements);
+      expect(receiver.getElement('el-1')).toBeDefined();
+      expect(receiver.getElement('el-2')).toBeDefined();
+    });
+
+    it('handles update messages', () => {
+      const updateCallback = vi.fn();
+      receiver.on('update', updateCallback);
+
+      // Init first
+      receiver.handleTrackerMessage(
+        createTrackerMessage('init', [createElementRect({ id: 'el-1', bounds: { x: 0, y: 0, width: 100, height: 50 } })])
+      );
+
+      // Then update
+      const updatedElements = [createElementRect({ id: 'el-1', bounds: { x: 50, y: 50, width: 100, height: 50 } })];
+      receiver.handleTrackerMessage(createTrackerMessage('update', updatedElements));
+
+      expect(updateCallback).toHaveBeenCalledOnce();
+      expect(receiver.getElement('el-1')!.bounds.x).toBe(50);
+    });
+
+    it('handles remove messages', () => {
+      const removeCallback = vi.fn();
+      receiver.on('remove', removeCallback);
+
+      receiver.handleTrackerMessage(
+        createTrackerMessage('init', [createElementRect({ id: 'el-1' })])
+      );
+      expect(receiver.getElement('el-1')).toBeDefined();
+
+      receiver.handleTrackerMessage(
+        createTrackerMessage('remove', [{ id: 'el-1' } as ElementRect])
+      );
+
+      expect(removeCallback).toHaveBeenCalledOnce();
+      expect(receiver.getElement('el-1')).toBeUndefined();
+    });
+
+    it('ignores messages with wrong type', () => {
+      const callback = vi.fn();
+      receiver.on('init', callback);
+
+      receiver.handleTrackerMessage({
+        type: 'WRONG_TYPE',
+        action: 'init',
+        elements: [createElementRect()],
+      });
+
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    it('ignores messages after destroy', () => {
+      const callback = vi.fn();
+      receiver.on('init', callback);
+
+      receiver.destroy();
+
+      receiver.handleTrackerMessage(
+        createTrackerMessage('init', [createElementRect()])
+      );
+
+      expect(callback).not.toHaveBeenCalled();
+    });
+  });
+});

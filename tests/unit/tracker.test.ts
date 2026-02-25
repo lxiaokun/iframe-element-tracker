@@ -340,4 +340,85 @@ describe('ElementTracker', () => {
       expect(mockTargetWindow.postMessage).not.toHaveBeenCalled();
     });
   });
+
+  // ==================== onMessage callback ====================
+
+  describe('onMessage callback', () => {
+    let callbackTracker: ElementTracker;
+    let onMessageFn: ReturnType<typeof vi.fn<(message: TrackerMessage) => void>>;
+
+    beforeEach(() => {
+      onMessageFn = vi.fn<(message: TrackerMessage) => void>();
+      callbackTracker = new ElementTracker({
+        onMessage: onMessageFn,
+      });
+    });
+
+    afterEach(() => {
+      callbackTracker.destroy();
+    });
+
+    it('calls onMessage callback on register instead of postMessage', () => {
+      callbackTracker.register(testElement, 'test-el');
+
+      expect(onMessageFn).toHaveBeenCalledOnce();
+      const msg = onMessageFn.mock.calls[0][0] as TrackerMessage;
+      expect(msg.type).toBe(MESSAGE_TYPE);
+      expect(msg.action).toBe('init');
+      expect(msg.elements).toHaveLength(1);
+      expect(msg.elements[0].id).toBe('test-el');
+    });
+
+    it('skips postMessage when onMessage is set', () => {
+      // Also verify that postMessage on window.parent is NOT called
+      const parentPostMessage = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => {});
+      callbackTracker.register(testElement, 'test-el');
+
+      expect(onMessageFn).toHaveBeenCalled();
+      expect(parentPostMessage).not.toHaveBeenCalled();
+      parentPostMessage.mockRestore();
+    });
+
+    it('calls onMessage callback on unregister', () => {
+      callbackTracker.register(testElement, 'test-el');
+      onMessageFn.mockClear();
+
+      callbackTracker.unregister('test-el');
+
+      expect(onMessageFn).toHaveBeenCalledOnce();
+      const msg = onMessageFn.mock.calls[0][0] as TrackerMessage;
+      expect(msg.action).toBe('remove');
+      expect(msg.elements[0].id).toBe('test-el');
+    });
+
+    it('calls onMessage callback on forceUpdate', () => {
+      callbackTracker.register(testElement, 'test-el');
+      onMessageFn.mockClear();
+
+      callbackTracker.forceUpdate();
+
+      expect(onMessageFn).toHaveBeenCalledOnce();
+      const msg = onMessageFn.mock.calls[0][0] as TrackerMessage;
+      expect(msg.action).toBe('update');
+    });
+
+    it('logs error when onMessage callback throws', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const throwingTracker = new ElementTracker({
+        onMessage: () => {
+          throw new Error('callback error');
+        },
+      });
+
+      throwingTracker.register(testElement, 'test-el');
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Error in onMessage callback:',
+        expect.any(Error)
+      );
+
+      throwingTracker.destroy();
+      errorSpy.mockRestore();
+    });
+  });
 });
