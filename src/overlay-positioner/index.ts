@@ -263,11 +263,14 @@ export class OverlayPositioner {
     borderRadius: ElementRect['styles']['border']['radius'],
     scale: number
   ): string {
-    const topLeft = parseFloat(borderRadius.topLeft) * scale;
-    const topRight = parseFloat(borderRadius.topRight) * scale;
-    const bottomRight = parseFloat(borderRadius.bottomRight) * scale;
-    const bottomLeft = parseFloat(borderRadius.bottomLeft) * scale;
-    return `${topLeft}px ${topRight}px ${bottomRight}px ${bottomLeft}px`;
+    const scaleValue = (value: string): string => {
+      // Preserve percentage values as-is (they are relative to the element's own size)
+      if (value.endsWith('%')) {
+        return value;
+      }
+      return `${parseFloat(value) * scale}px`;
+    };
+    return `${scaleValue(borderRadius.topLeft)} ${scaleValue(borderRadius.topRight)} ${scaleValue(borderRadius.bottomRight)} ${scaleValue(borderRadius.bottomLeft)}`;
   }
 
   /**
