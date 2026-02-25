@@ -201,6 +201,30 @@ describe('OverlayPositioner', () => {
       const result = positioner.scaleBorderRadius(radius, 1);
       expect(result).toBe('8px 8px 8px 8px');
     });
+
+    it('preserves percentage values without scaling', () => {
+      const radius = {
+        topLeft: '50%',
+        topRight: '50%',
+        bottomRight: '50%',
+        bottomLeft: '50%',
+      };
+
+      const result = positioner.scaleBorderRadius(radius, 0.5);
+      expect(result).toBe('50% 50% 50% 50%');
+    });
+
+    it('handles mixed px and percentage values', () => {
+      const radius = {
+        topLeft: '10px',
+        topRight: '50%',
+        bottomRight: '20px',
+        bottomLeft: '50%',
+      };
+
+      const result = positioner.scaleBorderRadius(radius, 2);
+      expect(result).toBe('20px 50% 40px 50%');
+    });
   });
 
   // ==================== getOverlayStyle ====================
