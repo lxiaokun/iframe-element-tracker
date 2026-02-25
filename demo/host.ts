@@ -3,7 +3,7 @@ import { OverlayPositioner } from '../src/overlay-positioner';
 import type { ElementRect } from '../src/shared';
 
 // Overlay rendering mode
-type OverlayMode = 'passthrough' | 'interactive' | 'labeled' | 'rich';
+type OverlayMode = 'off' | 'passthrough' | 'interactive' | 'labeled' | 'rich';
 
 let currentMode: OverlayMode = 'passthrough';
 let receiver: ElementReceiver | null = null;
@@ -16,6 +16,7 @@ const statusContent = document.getElementById('status-content')!;
 
 // Mode switch buttons
 const modeButtons = {
+  off: document.getElementById('mode-off')!,
   passthrough: document.getElementById('mode-passthrough')!,
   interactive: document.getElementById('mode-interactive')!,
   labeled: document.getElementById('mode-labeled')!,
@@ -55,6 +56,8 @@ function initReceiver() {
  * Create overlay element
  */
 function createOverlay(elementRect: ElementRect) {
+  if (currentMode === 'off') return;
+
   const overlay = document.createElement('div');
   overlay.dataset.overlayId = elementRect.id;
 
@@ -67,6 +70,8 @@ function createOverlay(elementRect: ElementRect) {
  * Update overlay element
  */
 function updateOverlay(elementRect: ElementRect) {
+  if (currentMode === 'off') return;
+
   let overlay = overlayElements.get(elementRect.id);
 
   if (!overlay) {
@@ -213,6 +218,13 @@ function setMode(mode: OverlayMode) {
     btn.classList.toggle('active', key === mode);
   });
 
+  if (mode === 'off') {
+    // Remove all overlays
+    overlayElements.forEach((overlay) => overlay.remove());
+    overlayElements.clear();
+    return;
+  }
+
   // Re-render all overlays
   if (receiver) {
     receiver.getElements().forEach((el) => {
@@ -294,6 +306,33 @@ testButtons.reset.addEventListener('click', () => {
   testStates.zoom = false;
   updateTestButtonStates();
   applyTestStyles();
+});
+
+// Inner overlay mode buttons
+type InnerOverlayMode = 'off' | 'passthrough' | 'interactive' | 'labeled' | 'rich';
+const innerModeButtons: Record<InnerOverlayMode, HTMLElement> = {
+  off: document.getElementById('inner-mode-off')!,
+  passthrough: document.getElementById('inner-mode-passthrough')!,
+  interactive: document.getElementById('inner-mode-interactive')!,
+  labeled: document.getElementById('inner-mode-labeled')!,
+  rich: document.getElementById('inner-mode-rich')!,
+};
+
+function setInnerMode(mode: InnerOverlayMode) {
+  Object.entries(innerModeButtons).forEach(([key, btn]) => {
+    btn.classList.toggle('active', key === mode);
+  });
+
+  // Send control message to iframe
+  iframe.contentWindow?.postMessage({
+    type: 'OVERLAY_CONTROL',
+    action: 'setMode',
+    mode,
+  }, '*');
+}
+
+Object.entries(innerModeButtons).forEach(([mode, btn]) => {
+  btn.addEventListener('click', () => setInnerMode(mode as InnerOverlayMode));
 });
 
 // Initialize after iframe loads

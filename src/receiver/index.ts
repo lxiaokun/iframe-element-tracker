@@ -19,19 +19,19 @@ export interface ReceiverOptions {
 }
 
 /**
- * ElementReceiver - Used in host pages
- * Receives element tracking information sent from iframe pages
+ * ElementReceiver - Used in host pages or same-page mode
+ * Receives element tracking information sent from iframe pages or directly via handleTrackerMessage
  */
 export class ElementReceiver {
-  private iframe: HTMLIFrameElement;
+  private iframe: HTMLIFrameElement | null;
   private allowedOrigin: string;
   private elements: Map<string, ElementRect> = new Map();
   private listeners: Map<MessageAction, Set<EventCallback>> = new Map();
-  private messageHandler: (event: MessageEvent) => void;
+  private messageHandler: ((event: MessageEvent) => void) | null = null;
   private isDestroyed = false;
 
-  constructor(iframe: HTMLIFrameElement, options: ReceiverOptions = {}) {
-    this.iframe = iframe;
+  constructor(iframe?: HTMLIFrameElement | null, options: ReceiverOptions = {}) {
+    this.iframe = iframe ?? null;
     this.allowedOrigin = options.allowedOrigin ?? '*';
 
     // Initialize event listener sets
@@ -39,13 +39,13 @@ export class ElementReceiver {
     this.listeners.set('update', new Set());
     this.listeners.set('remove', new Set());
 
-    // Message handler function
-    this.messageHandler = (event: MessageEvent) => {
-      this.handleMessage(event);
-    };
-
-    // Listen for message events
-    window.addEventListener('message', this.messageHandler);
+    // Only listen for message events when an iframe is provided
+    if (this.iframe) {
+      this.messageHandler = (event: MessageEvent) => {
+        this.handleMessage(event);
+      };
+      window.addEventListener('message', this.messageHandler);
+    }
   }
 
   /**
@@ -85,15 +85,41 @@ export class ElementReceiver {
   /**
    * Get the bound iframe element
    */
-  getIframe(): HTMLIFrameElement {
+  getIframe(): HTMLIFrameElement | null {
     return this.iframe;
   }
 
   /**
    * Get iframe position in the host page
    */
-  getIframeBounds(): DOMRect {
-    return this.iframe.getBoundingClientRect();
+  getIframeBounds(): DOMRect | null {
+    return this.iframe ? this.iframe.getBoundingClientRect() : null;
+  }
+
+  /**
+   * Directly handle a TrackerMessage without postMessage validation.
+   * Used for same-page tracking mode where tracker and receiver are in the same window.
+   */
+  handleTrackerMessage(message: TrackerMessage): void {
+    if (this.isDestroyed) {
+      return;
+    }
+
+    if (!message || message.type !== MESSAGE_TYPE) {
+      return;
+    }
+
+    switch (message.action) {
+      case 'init':
+        this.handleInit(message.elements);
+        break;
+      case 'update':
+        this.handleUpdate(message.elements);
+        break;
+      case 'remove':
+        this.handleRemove(message.elements);
+        break;
+    }
   }
 
   /**
@@ -105,7 +131,9 @@ export class ElementReceiver {
     }
 
     this.isDestroyed = true;
-    window.removeEventListener('message', this.messageHandler);
+    if (this.messageHandler) {
+      window.removeEventListener('message', this.messageHandler);
+    }
     this.elements.clear();
     this.listeners.clear();
   }
@@ -124,7 +152,7 @@ export class ElementReceiver {
     }
 
     // Validate message source is the bound iframe
-    if (event.source !== this.iframe.contentWindow) {
+    if (!this.iframe || event.source !== this.iframe.contentWindow) {
       return;
     }
 

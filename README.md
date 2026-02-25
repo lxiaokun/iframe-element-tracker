@@ -181,6 +181,87 @@ const dimensions = positioner.transformDimensions(bounds.width, bounds.height, c
 const borderRadius = positioner.scaleBorderRadius(styles.border.radius, context.iframeScale.scaleX);
 ```
 
+## Same-Page Tracking
+
+In addition to the cross-iframe tracking mode, the SDK supports **same-page tracking** — rendering overlay annotations directly within the same page as the tracked elements, without requiring an iframe.
+
+This is useful when you want to annotate elements on the current page itself, or when both host-page overlays and inner-page overlays are needed simultaneously.
+
+### How It Works
+
+1. Create an `ElementTracker` with the `onMessage` callback (bypasses `postMessage`)
+2. Create an `ElementReceiver` without an iframe (pass `null`)
+3. Wire them together: the tracker's `onMessage` feeds directly into the receiver's `handleTrackerMessage`
+
+```typescript
+import { ElementTracker } from 'iframe-element-tracker';
+import { ElementReceiver } from 'iframe-element-tracker';
+
+// Create receiver without iframe (same-page mode)
+const receiver = new ElementReceiver(null);
+
+// Create tracker with direct callback (no postMessage)
+const tracker = new ElementTracker({
+  onMessage: (msg) => receiver.handleTrackerMessage(msg),
+});
+
+// Register elements to track
+tracker.register(document.getElementById('my-element')!, 'my-element');
+
+// Listen for events and render overlays
+receiver.on('init', (elements) => {
+  elements.forEach(el => {
+    const overlay = createOverlay(el.id);
+    // Use document coordinates for absolute-positioned overlay container
+    overlay.style.left = `${el.bounds.x + window.scrollX}px`;
+    overlay.style.top = `${el.bounds.y + window.scrollY}px`;
+    overlay.style.width = `${el.bounds.width}px`;
+    overlay.style.height = `${el.bounds.height}px`;
+  });
+});
+
+receiver.on('update', (elements) => {
+  elements.forEach(el => updateOverlayPosition(el));
+});
+```
+
+### Overlay Container Setup
+
+For same-page tracking, use an `absolute`-positioned container so body-level scrolling is handled by the browser's compositing layer (zero-delay scroll sync):
+
+```html
+<div id="overlay-container" style="
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  min-height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 9999;
+"></div>
+```
+
+### Coexistence with Cross-iframe Mode
+
+Both modes can run simultaneously. For example, in an iframe page:
+
+```typescript
+// Cross-iframe tracker (sends data to host via postMessage)
+const hostTracker = new ElementTracker();
+
+// Same-page tracker (renders overlays within the iframe)
+const localReceiver = new ElementReceiver(null);
+const localTracker = new ElementTracker({
+  onMessage: (msg) => localReceiver.handleTrackerMessage(msg),
+});
+
+// Register the same elements to both trackers
+const element = document.getElementById('my-element')!;
+hostTracker.register(element, 'my-element');
+localTracker.register(element, 'my-element');
+```
+
 ## API Reference
 
 ### ElementTracker
@@ -196,6 +277,7 @@ new ElementTracker(options?: TrackerOptions)
 **Options:**
 - `targetWindow?: Window` - Target window for postMessage (default: `window.parent`)
 - `targetOrigin?: string` - Target origin for postMessage (default: `'*'`)
+- `onMessage?: (message: TrackerMessage) => void` - Direct message callback; when set, bypasses postMessage
 
 #### Methods
 
@@ -214,11 +296,13 @@ The ElementReceiver runs in the host page and receives element data from the ifr
 #### Constructor
 
 ```typescript
-new ElementReceiver(iframe: HTMLIFrameElement, options?: ReceiverOptions)
+new ElementReceiver(iframe?: HTMLIFrameElement | null, options?: ReceiverOptions)
 ```
 
 **Options:**
 - `allowedOrigin?: string` - Allowed origin for messages (default: `'*'`)
+
+When `iframe` is `null` or omitted, the receiver operates in same-page mode: it does not listen for `window` message events, and you must feed messages via `handleTrackerMessage()`.
 
 #### Methods
 
@@ -228,8 +312,9 @@ new ElementReceiver(iframe: HTMLIFrameElement, options?: ReceiverOptions)
 | `off(event, callback)` | Remove event listener |
 | `getElements()` | Get all tracked elements |
 | `getElement(id)` | Get a single element by ID |
-| `getIframe()` | Get the bound iframe element |
-| `getIframeBounds()` | Get iframe's bounding rect |
+| `getIframe()` | Get the bound iframe element (or `null` in same-page mode) |
+| `getIframeBounds()` | Get iframe's bounding rect (or `null` in same-page mode) |
+| `handleTrackerMessage(message)` | Directly process a TrackerMessage (for same-page mode) |
 | `destroy()` | Clean up all resources |
 
 ### OverlayPositioner

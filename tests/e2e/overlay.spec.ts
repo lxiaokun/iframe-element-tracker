@@ -262,3 +262,139 @@ async function verifyOverlayAlignment(
     ).toBeLessThanOrEqual(ALIGNMENT_TOLERANCE);
   }
 }
+
+// ==================== Inner Overlay E2E ====================
+
+test.describe('Inner Overlay E2E', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto(DEMO_URL);
+    // Wait for iframe to load and host overlays to be created
+    await page.waitForFunction(
+      (count) => {
+        const container = document.getElementById('overlay-container');
+        return container && container.children.length >= count;
+      },
+      TRACKED_ELEMENT_COUNT,
+      { timeout: 10000 }
+    );
+  });
+
+  test('inner overlay appears after enabling labeled mode', async ({ page }) => {
+    // Click Inner Overlay "Labeled" button
+    await page.click('#inner-mode-labeled');
+    await page.waitForTimeout(500);
+
+    // Verify overlays exist inside iframe
+    const iframe = page.frameLocator('#inner-frame');
+    const innerOverlayCount = await iframe.locator('#overlay-container > div').count();
+    expect(innerOverlayCount).toBe(TRACKED_ELEMENT_COUNT);
+
+    // Verify labeled class is applied (some elements may be offscreen with display:none)
+    const labeledCount = await iframe.locator('#overlay-container .overlay-labeled').count();
+    expect(labeledCount).toBeGreaterThan(0);
+
+    // Verify labels exist
+    const labelCount = await iframe.locator('#overlay-container .overlay-label').count();
+    expect(labelCount).toBeGreaterThan(0);
+  });
+
+  test('inner overlay is removed after switching to off', async ({ page }) => {
+    // Enable inner overlay
+    await page.click('#inner-mode-labeled');
+    await page.waitForTimeout(500);
+
+    const iframe = page.frameLocator('#inner-frame');
+    expect(await iframe.locator('#overlay-container > div').count()).toBe(TRACKED_ELEMENT_COUNT);
+
+    // Disable inner overlay
+    await page.click('#inner-mode-off');
+    await page.waitForTimeout(300);
+
+    expect(await iframe.locator('#overlay-container > div').count()).toBe(0);
+  });
+
+  test('host overlay and inner overlay can coexist', async ({ page }) => {
+    // Enable inner overlay
+    await page.click('#inner-mode-passthrough');
+    await page.waitForTimeout(500);
+
+    // Verify host overlays still exist
+    const hostOverlayCount = await page.locator('#overlay-container > div').count();
+    expect(hostOverlayCount).toBe(TRACKED_ELEMENT_COUNT);
+
+    // Verify inner overlays also exist
+    const iframe = page.frameLocator('#inner-frame');
+    const innerOverlayCount = await iframe.locator('#overlay-container > div').count();
+    expect(innerOverlayCount).toBe(TRACKED_ELEMENT_COUNT);
+  });
+
+  test('inner overlay aligns with iframe elements', async ({ page }) => {
+    // Enable inner overlay in passthrough mode
+    await page.click('#inner-mode-passthrough');
+    await page.waitForTimeout(500);
+
+    const iframe = page.frameLocator('#inner-frame');
+
+    // Verify alignment for a few elements
+    for (const elementId of ['element-1', 'element-2', 'element-3']) {
+      const positions = await iframe.locator('body').evaluate((_, id) => {
+        const element = document.getElementById(id);
+        if (!element) return null;
+        const elemRect = element.getBoundingClientRect();
+
+        const overlay = document.querySelector(
+          `[data-overlay-id="${id}"]`
+        ) as HTMLElement;
+        if (!overlay) return null;
+
+        // Overlay uses document coordinates (absolute positioning with scrollY offset)
+        const overlayLeft = parseFloat(overlay.style.left);
+        const overlayTop = parseFloat(overlay.style.top);
+        const overlayWidth = parseFloat(overlay.style.width);
+        const overlayHeight = parseFloat(overlay.style.height);
+
+        // Expected document coordinates
+        const expectedLeft = elemRect.x + window.scrollX;
+        const expectedTop = elemRect.y + window.scrollY;
+
+        return {
+          element: {
+            left: expectedLeft,
+            top: expectedTop,
+            width: elemRect.width,
+            height: elemRect.height,
+          },
+          overlay: {
+            left: overlayLeft,
+            top: overlayTop,
+            width: overlayWidth,
+            height: overlayHeight,
+          },
+        };
+      }, elementId);
+
+      expect(positions, `Failed to get positions for ${elementId}`).not.toBeNull();
+      if (!positions) continue;
+
+      expect(
+        Math.abs(positions.element.left - positions.overlay.left),
+        `${elementId} left: expected ${positions.element.left}, got ${positions.overlay.left}`
+      ).toBeLessThanOrEqual(ALIGNMENT_TOLERANCE);
+
+      expect(
+        Math.abs(positions.element.top - positions.overlay.top),
+        `${elementId} top: expected ${positions.element.top}, got ${positions.overlay.top}`
+      ).toBeLessThanOrEqual(ALIGNMENT_TOLERANCE);
+
+      expect(
+        Math.abs(positions.element.width - positions.overlay.width),
+        `${elementId} width: expected ${positions.element.width}, got ${positions.overlay.width}`
+      ).toBeLessThanOrEqual(ALIGNMENT_TOLERANCE);
+
+      expect(
+        Math.abs(positions.element.height - positions.overlay.height),
+        `${elementId} height: expected ${positions.element.height}, got ${positions.overlay.height}`
+      ).toBeLessThanOrEqual(ALIGNMENT_TOLERANCE);
+    }
+  });
+});

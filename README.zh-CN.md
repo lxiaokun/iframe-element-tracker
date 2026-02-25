@@ -181,6 +181,87 @@ const dimensions = positioner.transformDimensions(bounds.width, bounds.height, c
 const borderRadius = positioner.scaleBorderRadius(styles.border.radius, context.iframeScale.scaleX);
 ```
 
+## 同页面追踪
+
+除了跨 iframe 追踪模式外，SDK 还支持**同页面追踪**——直接在被追踪元素所在的同一页面中渲染覆盖层标注，无需 iframe。
+
+当你需要在当前页面内对元素进行标注，或者需要宿主页面覆盖层和内页覆盖层同时显示时，此模式非常有用。
+
+### 工作原理
+
+1. 创建带有 `onMessage` 回调的 `ElementTracker`（跳过 `postMessage`）
+2. 创建不带 iframe 的 `ElementReceiver`（传入 `null`）
+3. 将二者连接：tracker 的 `onMessage` 直接调用 receiver 的 `handleTrackerMessage`
+
+```typescript
+import { ElementTracker } from 'iframe-element-tracker';
+import { ElementReceiver } from 'iframe-element-tracker';
+
+// 创建无 iframe 的 receiver（同页模式）
+const receiver = new ElementReceiver(null);
+
+// 创建带直接回调的 tracker（不走 postMessage）
+const tracker = new ElementTracker({
+  onMessage: (msg) => receiver.handleTrackerMessage(msg),
+});
+
+// 注册需要追踪的元素
+tracker.register(document.getElementById('my-element')!, 'my-element');
+
+// 监听事件并渲染覆盖层
+receiver.on('init', (elements) => {
+  elements.forEach(el => {
+    const overlay = createOverlay(el.id);
+    // 使用文档坐标（配合 absolute 定位的覆盖层容器）
+    overlay.style.left = `${el.bounds.x + window.scrollX}px`;
+    overlay.style.top = `${el.bounds.y + window.scrollY}px`;
+    overlay.style.width = `${el.bounds.width}px`;
+    overlay.style.height = `${el.bounds.height}px`;
+  });
+});
+
+receiver.on('update', (elements) => {
+  elements.forEach(el => updateOverlayPosition(el));
+});
+```
+
+### 覆盖层容器设置
+
+同页模式下，使用 `absolute` 定位的容器，这样 body 级别的滚动由浏览器合成层处理（零延迟滚动同步）：
+
+```html
+<div id="overlay-container" style="
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  min-height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 9999;
+"></div>
+```
+
+### 与跨 iframe 模式共存
+
+两种模式可以同时运行。例如，在 iframe 页面中：
+
+```typescript
+// 跨 iframe tracker（通过 postMessage 发送数据到宿主页面）
+const hostTracker = new ElementTracker();
+
+// 同页 tracker（在 iframe 内渲染覆盖层）
+const localReceiver = new ElementReceiver(null);
+const localTracker = new ElementTracker({
+  onMessage: (msg) => localReceiver.handleTrackerMessage(msg),
+});
+
+// 将相同的元素注册到两个 tracker
+const element = document.getElementById('my-element')!;
+hostTracker.register(element, 'my-element');
+localTracker.register(element, 'my-element');
+```
+
 ## API 参考
 
 ### ElementTracker
@@ -196,6 +277,7 @@ new ElementTracker(options?: TrackerOptions)
 **配置项：**
 - `targetWindow?: Window` - postMessage 的目标窗口（默认：`window.parent`）
 - `targetOrigin?: string` - postMessage 的目标 origin（默认：`'*'`）
+- `onMessage?: (message: TrackerMessage) => void` - 直接消息回调；设置后跳过 postMessage
 
 #### 方法
 
@@ -214,11 +296,13 @@ ElementReceiver 运行在宿主页面，接收来自 iframe 的元素数据。
 #### 构造函数
 
 ```typescript
-new ElementReceiver(iframe: HTMLIFrameElement, options?: ReceiverOptions)
+new ElementReceiver(iframe?: HTMLIFrameElement | null, options?: ReceiverOptions)
 ```
 
 **配置项：**
 - `allowedOrigin?: string` - 允许的消息来源（默认：`'*'`）
+
+当 `iframe` 为 `null` 或省略时，receiver 进入同页模式：不监听 `window` 的 message 事件，需要通过 `handleTrackerMessage()` 传递消息。
 
 #### 方法
 
@@ -228,8 +312,9 @@ new ElementReceiver(iframe: HTMLIFrameElement, options?: ReceiverOptions)
 | `off(event, callback)` | 移除事件监听 |
 | `getElements()` | 获取所有追踪的元素 |
 | `getElement(id)` | 根据 ID 获取单个元素 |
-| `getIframe()` | 获取绑定的 iframe 元素 |
-| `getIframeBounds()` | 获取 iframe 的边界矩形 |
+| `getIframe()` | 获取绑定的 iframe 元素（同页模式返回 `null`） |
+| `getIframeBounds()` | 获取 iframe 的边界矩形（同页模式返回 `null`） |
+| `handleTrackerMessage(message)` | 直接处理 TrackerMessage（用于同页模式） |
 | `destroy()` | 清理所有资源 |
 
 ### OverlayPositioner
