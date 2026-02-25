@@ -16,7 +16,10 @@
       "Bash(npx tsc:*)",
       "mcp__chrome-devtools__resize_page",
       "mcp__chrome-devtools__list_console_messages",
-      "mcp__chrome-devtools__get_console_message"
+      "mcp__chrome-devtools__get_console_message",
+      "Bash(npm install:*)",
+      "Bash(npx playwright:*)",
+      "Bash(npx vitest:*)"
     ]
   }
 }
