@@ -21,22 +21,34 @@ This SDK requires control over both the host page and iframe page code (or abili
 ```
 iframe-element-tracker/
 ├── src/
-│   ├── shared/           # Shared types and constants
-│   │   ├── types.ts      # ElementRect, ElementAttributes, etc.
-│   │   ├── constants.ts  # MESSAGE_TYPE, throttle delay
-│   │   └── index.ts      # Re-exports
-│   ├── tracker/          # ElementTracker (iframe side)
+│   ├── shared/              # Shared types and constants
+│   │   ├── types.ts         # ElementRect, ElementAttributes, etc.
+│   │   ├── constants.ts     # MESSAGE_TYPE, throttle delay
+│   │   └── index.ts         # Re-exports
+│   ├── tracker/             # ElementTracker (iframe side)
 │   │   └── index.ts
-│   └── receiver/         # ElementReceiver (host side)
+│   ├── receiver/            # ElementReceiver (host side)
+│   │   └── index.ts
+│   └── overlay-positioner/  # OverlayPositioner (host side)
 │       └── index.ts
-├── demo/                 # Demo pages showing overlay rendering
-│   ├── host.html         # Host page with overlay container
-│   ├── host.ts           # Overlay rendering logic
-│   ├── inner.html        # iframe content with tracked elements
-│   └── inner.ts          # Element registration
-├── DESIGN.md             # Detailed design documentation (Chinese)
-├── README.md             # English documentation
-└── README.zh-CN.md       # Chinese documentation
+├── tests/
+│   ├── helpers/             # Test utilities
+│   │   ├── fixtures.ts      # ElementRect/ScaleContext factory functions
+│   │   └── dom-mocks.ts     # ResizeObserver/IntersectionObserver stubs
+│   ├── unit/                # Unit tests (Vitest)
+│   │   ├── overlay-positioner.test.ts
+│   │   ├── receiver.test.ts
+│   │   └── tracker.test.ts
+│   └── e2e/                 # E2E tests (Playwright)
+│       └── overlay.spec.ts
+├── demo/                    # Demo pages showing overlay rendering
+│   ├── host.html            # Host page with overlay container
+│   ├── host.ts              # Overlay rendering logic
+│   ├── inner.html           # iframe content with tracked elements
+│   └── inner.ts             # Element registration
+├── DESIGN.md                # Detailed design documentation (Chinese)
+├── README.md                # English documentation
+└── README.zh-CN.md          # Chinese documentation
 ```
 
 ## Common Development Commands
@@ -53,6 +65,18 @@ npm run build
 
 # Type check without emitting
 npx tsc --noEmit
+
+# Run unit tests
+npm test
+
+# Run unit tests in watch mode
+npm run test:watch
+
+# Run unit tests with coverage
+npm run test:coverage
+
+# Run E2E tests (auto-starts dev server if needed)
+npm run test:e2e
 ```
 
 The dev server runs at http://localhost:3000, demo page at http://localhost:3000/demo/host.html
@@ -96,7 +120,7 @@ For elements with CSS transforms:
 
 After completing a feature, always follow these steps in order:
 
-1. **Run tests** - Verify functionality works correctly in the demo page
+1. **Run tests** - Execute `npm test` for unit tests, `npm run test:e2e` for E2E tests
 2. **Run and fix lint errors** - Execute `npx tsc --noEmit` and fix any type errors
 3. **Update documentation** - Update README.md and README.zh-CN.md if API changes
 4. **Commit code** - Use Conventional Commits format
@@ -112,11 +136,13 @@ After completing a feature, always follow these steps in order:
 
 After making changes:
 1. Run `npx tsc --noEmit` to check for type errors
-2. Open http://localhost:3000/demo/host.html in browser
-3. Test scroll tracking (should be real-time, no delay)
-4. Test different overlay modes (Passthrough, Interactive, Labeled, Rich)
-5. Verify overlays align correctly with tracked elements
-6. Check that overlays can extend beyond iframe boundaries (in Labeled/Rich modes)
+2. Run `npm test` to execute unit tests
+3. Open http://localhost:3000/demo/host.html in browser
+4. Test scroll tracking (should be real-time, no delay)
+5. Test different overlay modes (Passthrough, Interactive, Labeled, Rich)
+6. Verify overlays align correctly with tracked elements
+7. Check that overlays can extend beyond iframe boundaries (in Labeled/Rich modes)
+8. Run `npm run test:e2e` for full E2E verification
 
 ## Debugging Guidelines
 

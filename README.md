@@ -314,6 +314,41 @@ interface ElementRect {
 - **Accessibility Tools**: Build accessibility overlays and helpers
 - **Design Tools**: Create visual editors that work across iframe boundaries
 
+## Testing
+
+The project includes unit tests (Vitest) and E2E tests (Playwright).
+
+```bash
+# Run unit tests
+npm test
+
+# Run unit tests in watch mode
+npm run test:watch
+
+# Run unit tests with coverage report
+npm run test:coverage
+
+# Run E2E tests (requires dev server running or auto-starts it)
+npm run test:e2e
+```
+
+### Unit Tests
+
+Unit tests cover the three core modules:
+
+- **OverlayPositioner** (`tests/unit/overlay-positioner.test.ts`) — Coordinate transformation math, dimension scaling, border-radius scaling, CSS zoom/transform parsing, ancestor scale accumulation
+- **ElementReceiver** (`tests/unit/receiver.test.ts`) — Message handling, origin validation, state management, event system, lifecycle
+- **ElementTracker** (`tests/unit/tracker.test.ts`) — Element registration, data collection, message format, lifecycle
+
+### E2E Tests
+
+E2E tests (`tests/e2e/overlay.spec.ts`) verify the full tracking and overlay rendering pipeline in a real browser:
+
+- Overlay creation and count
+- Overlay alignment under various iframe styles (Margin, Zoom, Transform, combinations)
+- Overlay mode switching
+- Scroll tracking
+
 ## Demo
 
 Run the demo to see the SDK in action:
