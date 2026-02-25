@@ -7,7 +7,6 @@ import {
   Spacing,
   TrackerMessage,
   MESSAGE_TYPE,
-  DEFAULT_THROTTLE_DELAY,
 } from '../shared';
 
 /**
@@ -48,7 +47,6 @@ export class ElementTracker {
   private trackedElements: Map<string, TrackedElement> = new Map();
   private targetWindow: Window;
   private targetOrigin: string;
-  private throttleDelay: number;
   private resizeObserver: ResizeObserver;
   private intersectionObserver: IntersectionObserver;
   private scrollHandler: () => void;
@@ -59,7 +57,6 @@ export class ElementTracker {
   constructor(options: TrackerOptions = {}) {
     this.targetWindow = options.targetWindow ?? window.parent;
     this.targetOrigin = options.targetOrigin ?? '*';
-    this.throttleDelay = options.throttleDelay ?? DEFAULT_THROTTLE_DELAY;
 
     // Create ResizeObserver to monitor element size changes
     this.resizeObserver = new ResizeObserver(() => {

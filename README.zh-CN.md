@@ -314,6 +314,41 @@ interface ElementRect {
 - **无障碍工具**：构建无障碍覆盖层和辅助工具
 - **设计工具**：创建跨 iframe 边界工作的可视化编辑器
 
+## 测试
+
+项目包含单元测试（Vitest）和 E2E 测试（Playwright）。
+
+```bash
+# 运行单元测试
+npm test
+
+# 以 watch 模式运行单元测试
+npm run test:watch
+
+# 运行单元测试并生成覆盖率报告
+npm run test:coverage
+
+# 运行 E2E 测试（需要开发服务器运行中，或自动启动）
+npm run test:e2e
+```
+
+### 单元测试
+
+单元测试覆盖三个核心模块：
+
+- **OverlayPositioner** (`tests/unit/overlay-positioner.test.ts`) — 坐标变换计算、尺寸缩放、border-radius 缩放、CSS zoom/transform 解析、祖先元素缩放累积
+- **ElementReceiver** (`tests/unit/receiver.test.ts`) — 消息处理、origin 验证、状态管理、事件系统、生命周期
+- **ElementTracker** (`tests/unit/tracker.test.ts`) — 元素注册、数据采集、消息格式、生命周期
+
+### E2E 测试
+
+E2E 测试（`tests/e2e/overlay.spec.ts`）在真实浏览器中验证完整的追踪和覆盖层渲染流程：
+
+- 覆盖层创建和数量
+- 不同 iframe 样式下的覆盖层对齐（Margin、Zoom、Transform 及组合）
+- 覆盖层模式切换
+- 滚动追踪
+
 ## 演示
 
 运行 demo 查看 SDK 效果：
