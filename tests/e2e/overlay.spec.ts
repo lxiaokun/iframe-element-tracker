@@ -218,6 +218,15 @@ async function waitForOverlayUpdate(page: Page): Promise<void> {
 }
 
 /**
+ * Wait for element style updates to propagate via postMessage.
+ * The host sends ELEMENT_STYLE_CONTROL to iframe, iframe applies styles
+ * and calls forceUpdate(), which sends updated rects back to host.
+ */
+async function waitForElementStyleUpdate(page: Page): Promise<void> {
+  await page.waitForTimeout(300);
+}
+
+/**
  * Get the top position of an overlay by element id.
  */
 async function getOverlayTop(page: Page, elementId: string): Promise<number> {
@@ -242,7 +251,8 @@ async function getOverlayTop(page: Page, elementId: string): Promise<number> {
  */
 async function verifyOverlayAlignment(
   page: Page,
-  elementIds: string[]
+  elementIds: string[],
+  tolerance: number = ALIGNMENT_TOLERANCE
 ): Promise<void> {
   for (const elementId of elementIds) {
     const positions = await page.evaluate(
@@ -335,24 +345,113 @@ async function verifyOverlayAlignment(
     expect(
       Math.abs(positions.element.left - positions.overlay.left),
       `${elementId} left: expected ${positions.element.left}, got ${positions.overlay.left}`
-    ).toBeLessThanOrEqual(ALIGNMENT_TOLERANCE);
+    ).toBeLessThanOrEqual(tolerance);
 
     expect(
       Math.abs(positions.element.top - positions.overlay.top),
       `${elementId} top: expected ${positions.element.top}, got ${positions.overlay.top}`
-    ).toBeLessThanOrEqual(ALIGNMENT_TOLERANCE);
+    ).toBeLessThanOrEqual(tolerance);
 
     expect(
       Math.abs(positions.element.width - positions.overlay.width),
       `${elementId} width: expected ${positions.element.width}, got ${positions.overlay.width}`
-    ).toBeLessThanOrEqual(ALIGNMENT_TOLERANCE);
+    ).toBeLessThanOrEqual(tolerance);
 
     expect(
       Math.abs(positions.element.height - positions.overlay.height),
       `${elementId} height: expected ${positions.element.height}, got ${positions.overlay.height}`
-    ).toBeLessThanOrEqual(ALIGNMENT_TOLERANCE);
+    ).toBeLessThanOrEqual(tolerance);
   }
 }
+
+// ==================== Inner Overlay E2E ====================
+
+// ==================== Element Style E2E ====================
+
+test.describe('Element Style E2E', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto(DEMO_URL);
+    await page.waitForFunction(
+      (count) => {
+        const container = document.getElementById('overlay-container');
+        return container && container.children.length >= count;
+      },
+      TRACKED_ELEMENT_COUNT,
+      { timeout: 10000 }
+    );
+  });
+
+  test('overlay aligns after toggling element Margin', async ({ page }) => {
+    await page.click('#elem-test-margin');
+    await waitForElementStyleUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1']);
+  });
+
+  test('overlay aligns after toggling element Padding', async ({ page }) => {
+    await page.click('#elem-test-padding');
+    await waitForElementStyleUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1']);
+  });
+
+  test('overlay aligns after toggling element Border', async ({ page }) => {
+    await page.click('#elem-test-border');
+    await waitForElementStyleUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1']);
+  });
+
+  test('overlay aligns after toggling element Border Radius', async ({ page }) => {
+    await page.click('#elem-test-border-radius');
+    await waitForElementStyleUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1']);
+  });
+
+  test('overlay aligns after toggling element Box Sizing', async ({ page }) => {
+    await page.click('#elem-test-box-sizing');
+    await waitForElementStyleUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1']);
+  });
+
+  test('overlay aligns after toggling element Scale', async ({ page }) => {
+    await page.click('#elem-test-scale');
+    await waitForElementStyleUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1']);
+  });
+
+  test('overlay aligns after toggling element Rotate', async ({ page }) => {
+    await page.click('#elem-test-rotate');
+    await waitForElementStyleUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1']);
+  });
+
+  test('overlay aligns after toggling element Margin + Padding', async ({ page }) => {
+    await page.click('#elem-test-margin');
+    await page.click('#elem-test-padding');
+    await waitForElementStyleUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1']);
+  });
+
+  test('overlay aligns after toggling element Box Sizing + Padding + Border', async ({ page }) => {
+    await page.click('#elem-test-box-sizing');
+    await page.click('#elem-test-padding');
+    await page.click('#elem-test-border');
+    await waitForElementStyleUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1']);
+  });
+
+  test('overlay aligns after toggling element Scale + iframe Zoom', async ({ page }) => {
+    await page.click('#elem-test-scale');
+    await page.click('#test-zoom');
+    await waitForElementStyleUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1']);
+  });
+
+  test('overlay aligns after toggling element Rotate + iframe Transform', async ({ page }) => {
+    await page.click('#elem-test-rotate');
+    await page.click('#test-transform');
+    await waitForElementStyleUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1']);
+  });
+});
 
 // ==================== Inner Overlay E2E ====================
 
