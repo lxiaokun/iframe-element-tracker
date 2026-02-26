@@ -240,11 +240,48 @@ function setLocalOverlayMode(mode: OverlayMode) {
   }
 }
 
+/**
+ * Apply test styles to element-1 based on host control panel state
+ */
+function applyElementTestStyles(styles: Record<string, boolean>) {
+  const el = document.getElementById('element-1') as HTMLElement;
+  if (!el) return;
+
+  el.style.margin = styles.margin ? '30px' : '';
+  el.style.padding = styles.padding ? '40px' : '';
+  el.style.border = styles.border ? '8px solid #2980b9' : '';
+  el.style.borderRadius = styles.borderRadius ? '50%' : '';
+  el.style.boxSizing = styles.boxSizing ? 'content-box' : '';
+
+  if (styles.scale) {
+    el.style.transform = 'scale(1.3)';
+    el.style.transformOrigin = 'top left';
+  } else if (styles.rotate) {
+    el.style.transform = 'rotate(15deg)';
+    el.style.transformOrigin = '';
+  } else {
+    el.style.transform = '';
+    el.style.transformOrigin = '';
+  }
+
+  el.style.opacity = styles.opacity ? '0.3' : '';
+
+  tracker.forceUpdate();
+  if (localTracker) {
+    localTracker.forceUpdate();
+  }
+}
+
 // Listen for control messages from host
 window.addEventListener('message', (event) => {
   if (event.data?.type === 'OVERLAY_CONTROL') {
     if (event.data.action === 'setMode') {
       setLocalOverlayMode(event.data.mode);
+    }
+  }
+  if (event.data?.type === 'ELEMENT_STYLE_CONTROL') {
+    if (event.data.action === 'applyStyles') {
+      applyElementTestStyles(event.data.styles);
     }
   }
 });

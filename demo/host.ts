@@ -377,6 +377,115 @@ testButtons.reset.addEventListener('click', () => {
   applyTestStyles();
 });
 
+// Element style test buttons
+const elemTestButtons = {
+  margin: document.getElementById('elem-test-margin')!,
+  padding: document.getElementById('elem-test-padding')!,
+  border: document.getElementById('elem-test-border')!,
+  borderRadius: document.getElementById('elem-test-border-radius')!,
+  boxSizing: document.getElementById('elem-test-box-sizing')!,
+  scale: document.getElementById('elem-test-scale')!,
+  rotate: document.getElementById('elem-test-rotate')!,
+  opacity: document.getElementById('elem-test-opacity')!,
+  reset: document.getElementById('elem-test-reset')!,
+};
+
+// Element style test states
+const elemTestStates = {
+  margin: false,
+  padding: false,
+  border: false,
+  borderRadius: false,
+  boxSizing: false,
+  scale: false,
+  rotate: false,
+  opacity: false,
+};
+
+// Scale and Rotate are mutually exclusive (both set transform)
+const elemTransformKeys = ['scale', 'rotate'] as const;
+
+function updateElemTestButtonStates() {
+  elemTestButtons.margin.classList.toggle('active', elemTestStates.margin);
+  elemTestButtons.padding.classList.toggle('active', elemTestStates.padding);
+  elemTestButtons.border.classList.toggle('active', elemTestStates.border);
+  elemTestButtons.borderRadius.classList.toggle('active', elemTestStates.borderRadius);
+  elemTestButtons.boxSizing.classList.toggle('active', elemTestStates.boxSizing);
+  elemTestButtons.scale.classList.toggle('active', elemTestStates.scale);
+  elemTestButtons.rotate.classList.toggle('active', elemTestStates.rotate);
+  elemTestButtons.opacity.classList.toggle('active', elemTestStates.opacity);
+}
+
+function sendElementStyleUpdate() {
+  iframe.contentWindow?.postMessage({
+    type: 'ELEMENT_STYLE_CONTROL',
+    action: 'applyStyles',
+    styles: elemTestStates,
+  }, '*');
+}
+
+elemTestButtons.margin.addEventListener('click', () => {
+  elemTestStates.margin = !elemTestStates.margin;
+  updateElemTestButtonStates();
+  sendElementStyleUpdate();
+});
+
+elemTestButtons.padding.addEventListener('click', () => {
+  elemTestStates.padding = !elemTestStates.padding;
+  updateElemTestButtonStates();
+  sendElementStyleUpdate();
+});
+
+elemTestButtons.border.addEventListener('click', () => {
+  elemTestStates.border = !elemTestStates.border;
+  updateElemTestButtonStates();
+  sendElementStyleUpdate();
+});
+
+elemTestButtons.borderRadius.addEventListener('click', () => {
+  elemTestStates.borderRadius = !elemTestStates.borderRadius;
+  updateElemTestButtonStates();
+  sendElementStyleUpdate();
+});
+
+elemTestButtons.boxSizing.addEventListener('click', () => {
+  elemTestStates.boxSizing = !elemTestStates.boxSizing;
+  updateElemTestButtonStates();
+  sendElementStyleUpdate();
+});
+
+function toggleElemTransformButton(key: (typeof elemTransformKeys)[number]) {
+  const wasActive = elemTestStates[key];
+  for (const k of elemTransformKeys) {
+    elemTestStates[k] = false;
+  }
+  elemTestStates[key] = !wasActive;
+  updateElemTestButtonStates();
+  sendElementStyleUpdate();
+}
+
+elemTestButtons.scale.addEventListener('click', () => toggleElemTransformButton('scale'));
+elemTestButtons.rotate.addEventListener('click', () => toggleElemTransformButton('rotate'));
+
+elemTestButtons.opacity.addEventListener('click', () => {
+  elemTestStates.opacity = !elemTestStates.opacity;
+  updateElemTestButtonStates();
+  sendElementStyleUpdate();
+});
+
+elemTestButtons.reset.addEventListener('click', () => {
+  elemTestStates.margin = false;
+  elemTestStates.padding = false;
+  elemTestStates.border = false;
+  elemTestStates.borderRadius = false;
+  elemTestStates.boxSizing = false;
+  elemTestStates.scale = false;
+  elemTestStates.rotate = false;
+  elemTestStates.opacity = false;
+  updateElemTestButtonStates();
+  sendElementStyleUpdate();
+});
+
 // Inner overlay mode buttons
 type InnerOverlayMode = 'off' | 'passthrough' | 'interactive' | 'labeled' | 'rich';
 const innerModeButtons: Record<InnerOverlayMode, HTMLElement> = {

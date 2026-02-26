@@ -229,22 +229,58 @@ export class ElementTracker {
 
     if (hasTransform) {
       // When transformed, use offsetWidth/offsetHeight for original size
-      // Position is calculated from bounding box center
       const originalWidth = htmlElement.offsetWidth;
       const originalHeight = htmlElement.offsetHeight;
 
-      // getBoundingClientRect returns the transformed bounding box
-      // We need to calculate the original rect's top-left position
-      // For simple cases, use bounding box center for approximate positioning
-      const centerX = domRect.x + domRect.width / 2;
-      const centerY = domRect.y + domRect.height / 2;
+      // Parse the CSS transform matrix: matrix(a, b, c, d, e, f)
+      const matrixMatch = computedStyle.transform.match(/^matrix\((.+)\)$/);
+      if (matrixMatch) {
+        const [a, b, c, d, e, f] = matrixMatch[1].split(',').map((v) => parseFloat(v.trim()));
 
-      bounds = {
-        x: centerX - originalWidth / 2,
-        y: centerY - originalHeight / 2,
-        width: originalWidth,
-        height: originalHeight,
-      };
+        // Parse transform-origin (always computed as "Xpx Ypx")
+        const originParts = computedStyle.transformOrigin.split(' ');
+        const ox = parseFloat(originParts[0]) || 0;
+        const oy = parseFloat(originParts[1]) || 0;
+
+        // CSS transform applies as: translate(origin) * matrix * translate(-origin)
+        // A point (px, py) in local coordinates transforms to:
+        //   tx = ox + a*(px-ox) + c*(py-oy) + e
+        //   ty = oy + b*(px-ox) + d*(py-oy) + f
+        // Compute the four transformed corners (in element-local space)
+        const corners = [
+          [0, 0],
+          [originalWidth, 0],
+          [0, originalHeight],
+          [originalWidth, originalHeight],
+        ];
+        let minTX = Infinity;
+        let minTY = Infinity;
+        for (const [px, py] of corners) {
+          const tx = ox + a * (px - ox) + c * (py - oy) + e;
+          const ty = oy + b * (px - ox) + d * (py - oy) + f;
+          if (tx < minTX) minTX = tx;
+          if (ty < minTY) minTY = ty;
+        }
+
+        // domRect is the AABB of the transformed element in viewport.
+        // domRect.x = untransformedX + minTX, so:
+        bounds = {
+          x: domRect.x - minTX,
+          y: domRect.y - minTY,
+          width: originalWidth,
+          height: originalHeight,
+        };
+      } else {
+        // Fallback for non-matrix transforms (e.g. matrix3d): use center-based approximation
+        const centerX = domRect.x + domRect.width / 2;
+        const centerY = domRect.y + domRect.height / 2;
+        bounds = {
+          x: centerX - originalWidth / 2,
+          y: centerY - originalHeight / 2,
+          width: originalWidth,
+          height: originalHeight,
+        };
+      }
     } else {
       bounds = {
         x: domRect.x,
