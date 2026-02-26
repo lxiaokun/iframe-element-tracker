@@ -24,7 +24,7 @@ const elementsToTrack = [
 
 let localOverlayMode: OverlayMode = 'off';
 let localReceiver: ElementReceiver | null = null;
-let localTracker: ElementTracker | null = null;
+let unsubscribeListener: (() => void) | null = null;
 const overlayElements: Map<string, HTMLElement> = new Map();
 
 function getOverlayContainer(): HTMLElement {
@@ -168,17 +168,14 @@ function removeAllLocalOverlays() {
 }
 
 /**
- * Start local tracking: create localTracker + localReceiver, register elements
+ * Start local tracking: create localReceiver, subscribe to tracker via addMessageListener
  */
 function startLocalTracking() {
-  if (localTracker) {
+  if (unsubscribeListener) {
     return;
   }
 
   localReceiver = new ElementReceiver(null);
-  localTracker = new ElementTracker({
-    onMessage: (msg) => localReceiver!.handleTrackerMessage(msg),
-  });
 
   localReceiver.on('init', (elements) => {
     elements.forEach((el) => createLocalOverlay(el));
@@ -192,24 +189,19 @@ function startLocalTracking() {
     elements.forEach((el) => removeLocalOverlay(el.id));
   });
 
-  // Register elements to local tracker
-  elementsToTrack.forEach(({ id, label }) => {
-    const element = document.getElementById(id);
-    if (element) {
-      localTracker!.register(element, id, {
-        metadata: { label },
-      });
-    }
-  });
+  // Subscribe to tracker — auto-replays current state as 'init'
+  unsubscribeListener = tracker.addMessageListener(
+    (msg) => localReceiver!.handleTrackerMessage(msg),
+  );
 }
 
 /**
- * Stop local tracking: destroy localTracker + localReceiver, remove overlays
+ * Stop local tracking: unsubscribe from tracker, destroy localReceiver, remove overlays
  */
 function stopLocalTracking() {
-  if (localTracker) {
-    localTracker.destroy();
-    localTracker = null;
+  if (unsubscribeListener) {
+    unsubscribeListener();
+    unsubscribeListener = null;
   }
   if (localReceiver) {
     localReceiver.destroy();
@@ -230,7 +222,7 @@ function setLocalOverlayMode(mode: OverlayMode) {
   }
 
   // Start tracking if not already running
-  if (!localTracker) {
+  if (!unsubscribeListener) {
     startLocalTracking();
   } else {
     // Re-render all overlays with new mode
@@ -267,9 +259,6 @@ function applyElementTestStyles(styles: Record<string, boolean>) {
   el.style.opacity = styles.opacity ? '0.3' : '';
 
   tracker.forceUpdate();
-  if (localTracker) {
-    localTracker.forceUpdate();
-  }
 }
 
 // Listen for control messages from host
@@ -304,5 +293,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Expose to global for debugging
 (window as any).tracker = tracker;
-(window as any).localTracker = localTracker;
 (window as any).setLocalOverlayMode = setLocalOverlayMode;

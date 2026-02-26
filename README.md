@@ -189,26 +189,22 @@ This is useful when you want to annotate elements on the current page itself, or
 
 ### How It Works
 
-1. Create an `ElementTracker` with the `onMessage` callback (bypasses `postMessage`)
+1. Create an `ElementTracker` normally (sends via `postMessage`, or with `onMessage` callback)
 2. Create an `ElementReceiver` without an iframe (pass `null`)
-3. Wire them together: the tracker's `onMessage` feeds directly into the receiver's `handleTrackerMessage`
+3. Use `addMessageListener` to subscribe the receiver — the listener automatically receives the current state as an `init` message
 
 ```typescript
 import { ElementTracker } from 'iframe-element-tracker';
 import { ElementReceiver } from 'iframe-element-tracker';
 
-// Create receiver without iframe (same-page mode)
-const receiver = new ElementReceiver(null);
-
-// Create tracker with direct callback (no postMessage)
-const tracker = new ElementTracker({
-  onMessage: (msg) => receiver.handleTrackerMessage(msg),
-});
+const tracker = new ElementTracker();
 
 // Register elements to track
 tracker.register(document.getElementById('my-element')!, 'my-element');
 
-// Listen for events and render overlays
+// Later, when same-page overlays are needed:
+const receiver = new ElementReceiver(null);
+
 receiver.on('init', (elements) => {
   elements.forEach(el => {
     const overlay = createOverlay(el.id);
@@ -223,6 +219,15 @@ receiver.on('init', (elements) => {
 receiver.on('update', (elements) => {
   elements.forEach(el => updateOverlayPosition(el));
 });
+
+// Subscribe — automatically replays current state
+const unsubscribe = tracker.addMessageListener(
+  (msg) => receiver.handleTrackerMessage(msg),
+);
+
+// To stop:
+unsubscribe();
+receiver.destroy();
 ```
 
 ### Overlay Container Setup
@@ -244,22 +249,23 @@ For same-page tracking, use an `absolute`-positioned container so body-level scr
 
 ### Coexistence with Cross-iframe Mode
 
-Both modes can run simultaneously. For example, in an iframe page:
+A single tracker can feed both the cross-iframe receiver (via postMessage) and a same-page receiver (via `addMessageListener`) simultaneously:
 
 ```typescript
-// Cross-iframe tracker (sends data to host via postMessage)
-const hostTracker = new ElementTracker();
+// Single tracker sends to host via postMessage
+const tracker = new ElementTracker();
+tracker.register(element, 'my-element');
 
-// Same-page tracker (renders overlays within the iframe)
+// Add a same-page receiver alongside the postMessage dispatch
 const localReceiver = new ElementReceiver(null);
-const localTracker = new ElementTracker({
-  onMessage: (msg) => localReceiver.handleTrackerMessage(msg),
-});
+const unsubscribe = tracker.addMessageListener(
+  (msg) => localReceiver.handleTrackerMessage(msg),
+);
+// localReceiver automatically receives current state
 
-// Register the same elements to both trackers
-const element = document.getElementById('my-element')!;
-hostTracker.register(element, 'my-element');
-localTracker.register(element, 'my-element');
+// To stop same-page overlays:
+unsubscribe();
+localReceiver.destroy();
 ```
 
 ## API Reference
@@ -287,6 +293,8 @@ new ElementTracker(options?: TrackerOptions)
 | `unregister(id)` | Stop tracking an element |
 | `updateMetadata(id, metadata)` | Update element's metadata |
 | `forceUpdate()` | Manually trigger an update |
+| `addMessageListener(listener)` | Add a message listener; auto-replays current state (returns unsubscribe function) |
+| `removeMessageListener(listener)` | Remove a previously added message listener |
 | `destroy()` | Clean up all resources |
 
 ### ElementReceiver
@@ -433,6 +441,8 @@ E2E tests (`tests/e2e/overlay.spec.ts`) verify the full tracking and overlay ren
 - Overlay alignment under various iframe styles (Margin, Zoom, Transform, combinations)
 - Overlay mode switching
 - Scroll tracking
+- Element style E2E (margin, padding, border, border-radius, transform, opacity)
+- Inner overlay E2E (same-page overlay creation, alignment, and coexistence with host overlays)
 
 ## Demo
 

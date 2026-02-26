@@ -3,6 +3,7 @@ import { ElementTracker } from '../../src/tracker';
 import { MESSAGE_TYPE } from '../../src/shared';
 import { installObserverMocks } from '../helpers/dom-mocks';
 import type { TrackerMessage } from '../../src/shared';
+import type { TrackerMessageListener } from '../../src/tracker';
 
 describe('ElementTracker', () => {
   let tracker: ElementTracker;
@@ -418,6 +419,173 @@ describe('ElementTracker', () => {
       );
 
       throwingTracker.destroy();
+      errorSpy.mockRestore();
+    });
+  });
+
+  // ==================== addMessageListener / removeMessageListener ====================
+
+  describe('addMessageListener / removeMessageListener', () => {
+    it('listener receives messages alongside postMessage on register', () => {
+      const listener = vi.fn<TrackerMessageListener>();
+      tracker.addMessageListener(listener);
+
+      tracker.register(testElement, 'test-el');
+
+      // Both postMessage and listener should be called
+      expect(mockTargetWindow.postMessage).toHaveBeenCalledOnce();
+      expect(listener).toHaveBeenCalledOnce();
+
+      const msg = listener.mock.calls[0][0];
+      expect(msg.type).toBe(MESSAGE_TYPE);
+      expect(msg.action).toBe('init');
+      expect(msg.elements).toHaveLength(1);
+      expect(msg.elements[0].id).toBe('test-el');
+    });
+
+    it('auto-replays current state as init to new listener', () => {
+      tracker.register(testElement, 'test-el');
+      mockTargetWindow.postMessage.mockClear();
+
+      const listener = vi.fn<TrackerMessageListener>();
+      tracker.addMessageListener(listener);
+
+      // Listener should be called immediately with init
+      expect(listener).toHaveBeenCalledOnce();
+      const msg = listener.mock.calls[0][0];
+      expect(msg.action).toBe('init');
+      expect(msg.elements).toHaveLength(1);
+      expect(msg.elements[0].id).toBe('test-el');
+
+      // postMessage should NOT be called (replay is only for the new listener)
+      expect(mockTargetWindow.postMessage).not.toHaveBeenCalled();
+    });
+
+    it('does not replay when no elements are registered', () => {
+      const listener = vi.fn<TrackerMessageListener>();
+      tracker.addMessageListener(listener);
+
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('listener receives messages alongside constructor onMessage', () => {
+      const onMessageFn = vi.fn<TrackerMessageListener>();
+      const additionalListener = vi.fn<TrackerMessageListener>();
+
+      const callbackTracker = new ElementTracker({
+        onMessage: onMessageFn,
+      });
+      callbackTracker.addMessageListener(additionalListener);
+
+      callbackTracker.register(testElement, 'test-el');
+
+      expect(onMessageFn).toHaveBeenCalledOnce();
+      expect(additionalListener).toHaveBeenCalledOnce();
+
+      // Both receive the same message
+      expect(onMessageFn.mock.calls[0][0]).toEqual(additionalListener.mock.calls[0][0]);
+
+      callbackTracker.destroy();
+    });
+
+    it('removeMessageListener stops delivery', () => {
+      const listener = vi.fn<TrackerMessageListener>();
+      tracker.addMessageListener(listener);
+
+      tracker.register(testElement, 'test-el');
+      expect(listener).toHaveBeenCalledOnce();
+      listener.mockClear();
+
+      tracker.removeMessageListener(listener);
+      tracker.forceUpdate();
+
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('returned unsubscribe function works', () => {
+      const listener = vi.fn<TrackerMessageListener>();
+      const unsubscribe = tracker.addMessageListener(listener);
+
+      tracker.register(testElement, 'test-el');
+      expect(listener).toHaveBeenCalledOnce();
+      listener.mockClear();
+
+      unsubscribe();
+      tracker.forceUpdate();
+
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('destroy clears all listeners', () => {
+      const listener = vi.fn<TrackerMessageListener>();
+      tracker.addMessageListener(listener);
+
+      tracker.register(testElement, 'test-el');
+      expect(listener).toHaveBeenCalledOnce();
+      listener.mockClear();
+
+      tracker.destroy();
+
+      // Re-create tracker so afterEach destroy doesn't fail
+      tracker = new ElementTracker({
+        targetWindow: mockTargetWindow as unknown as Window,
+        targetOrigin: '*',
+      });
+
+      // Original listener should not be called on the destroyed tracker
+      // (tracker is destroyed, so forceUpdate does nothing anyway)
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('multiple listeners all receive messages', () => {
+      const listener1 = vi.fn<TrackerMessageListener>();
+      const listener2 = vi.fn<TrackerMessageListener>();
+      const listener3 = vi.fn<TrackerMessageListener>();
+
+      tracker.addMessageListener(listener1);
+      tracker.addMessageListener(listener2);
+      tracker.addMessageListener(listener3);
+
+      tracker.register(testElement, 'test-el');
+
+      expect(listener1).toHaveBeenCalledOnce();
+      expect(listener2).toHaveBeenCalledOnce();
+      expect(listener3).toHaveBeenCalledOnce();
+
+      // All receive the same message
+      expect(listener1.mock.calls[0][0]).toEqual(listener2.mock.calls[0][0]);
+      expect(listener2.mock.calls[0][0]).toEqual(listener3.mock.calls[0][0]);
+    });
+
+    it('listener error does not affect other listeners or primary dispatch', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const listener1 = vi.fn<TrackerMessageListener>();
+      const throwingListener = vi.fn<TrackerMessageListener>().mockImplementation(() => {
+        throw new Error('listener error');
+      });
+      const listener2 = vi.fn<TrackerMessageListener>();
+
+      tracker.addMessageListener(listener1);
+      tracker.addMessageListener(throwingListener);
+      tracker.addMessageListener(listener2);
+
+      tracker.register(testElement, 'test-el');
+
+      // Primary dispatch works
+      expect(mockTargetWindow.postMessage).toHaveBeenCalledOnce();
+
+      // All listeners are called regardless of errors
+      expect(listener1).toHaveBeenCalledOnce();
+      expect(throwingListener).toHaveBeenCalledOnce();
+      expect(listener2).toHaveBeenCalledOnce();
+
+      // Error is logged
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Error in message listener:',
+        expect.any(Error)
+      );
+
       errorSpy.mockRestore();
     });
   });
