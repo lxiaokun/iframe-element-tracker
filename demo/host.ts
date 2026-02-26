@@ -379,6 +379,7 @@ testButtons.reset.addEventListener('click', () => {
 
 // Element style test buttons
 const elemTestButtons = {
+  hover: document.getElementById('elem-test-hover')!,
   margin: document.getElementById('elem-test-margin')!,
   padding: document.getElementById('elem-test-padding')!,
   border: document.getElementById('elem-test-border')!,
@@ -392,6 +393,7 @@ const elemTestButtons = {
 
 // Element style test states
 const elemTestStates = {
+  hover: false,
   margin: false,
   padding: false,
   border: false,
@@ -406,6 +408,7 @@ const elemTestStates = {
 const elemTransformKeys = ['scale', 'rotate'] as const;
 
 function updateElemTestButtonStates() {
+  elemTestButtons.hover.classList.toggle('active', elemTestStates.hover);
   elemTestButtons.margin.classList.toggle('active', elemTestStates.margin);
   elemTestButtons.padding.classList.toggle('active', elemTestStates.padding);
   elemTestButtons.border.classList.toggle('active', elemTestStates.border);
@@ -423,6 +426,12 @@ function sendElementStyleUpdate() {
     styles: elemTestStates,
   }, '*');
 }
+
+elemTestButtons.hover.addEventListener('click', () => {
+  elemTestStates.hover = !elemTestStates.hover;
+  updateElemTestButtonStates();
+  sendElementStyleUpdate();
+});
 
 elemTestButtons.margin.addEventListener('click', () => {
   elemTestStates.margin = !elemTestStates.margin;
@@ -474,6 +483,7 @@ elemTestButtons.opacity.addEventListener('click', () => {
 });
 
 elemTestButtons.reset.addEventListener('click', () => {
+  elemTestStates.hover = false;
   elemTestStates.margin = false;
   elemTestStates.padding = false;
   elemTestStates.border = false;
