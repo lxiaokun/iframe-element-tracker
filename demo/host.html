@@ -87,6 +87,34 @@
       border-right: none;
     }
 
+    /* Mode toggle button — visually distinct from style buttons */
+    .control-panel button.mode-toggle {
+      background: transparent;
+      border: 1px solid #555;
+      color: #aaa;
+    }
+
+    .control-panel button.mode-toggle:hover:not(.active) {
+      background: transparent;
+      border-color: #888;
+      color: #ccc;
+    }
+
+    .control-panel button.mode-toggle.active {
+      background: transparent;
+      border-color: #e2b714;
+      color: #e2b714;
+      box-shadow: 0 0 8px rgba(226, 183, 20, 0.3);
+    }
+
+    /* Vertical divider between mode toggle and style buttons */
+    .toggle-divider {
+      width: 1px;
+      height: 24px;
+      background: #444;
+      margin: 0 4px;
+    }
+
     /* iframe 容器 */
     .iframe-wrapper {
       position: relative;
@@ -281,6 +309,9 @@
 
   <div class="control-panel">
     <label>Test element styles:</label>
+    <span class="toggle-divider"></span>
+    <button id="elem-test-hover" class="mode-toggle">Hover</button>
+    <span class="toggle-divider"></span>
     <button id="elem-test-margin">Margin</button>
     <button id="elem-test-padding">Padding</button>
     <button id="elem-test-border">Border</button>

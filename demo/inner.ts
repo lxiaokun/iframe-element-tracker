@@ -233,12 +233,9 @@ function setLocalOverlayMode(mode: OverlayMode) {
 }
 
 /**
- * Apply test styles to element-1 based on host control panel state
+ * Apply style values to element-1
  */
-function applyElementTestStyles(styles: Record<string, boolean>) {
-  const el = document.getElementById('element-1') as HTMLElement;
-  if (!el) return;
-
+function setElementStyles(el: HTMLElement, styles: Record<string, boolean>) {
   el.style.margin = styles.margin ? '30px' : '';
   el.style.padding = styles.padding ? '40px' : '';
   el.style.border = styles.border ? '8px solid #2980b9' : '';
@@ -257,8 +254,82 @@ function applyElementTestStyles(styles: Record<string, boolean>) {
   }
 
   el.style.opacity = styles.opacity ? '0.3' : '';
+}
 
-  tracker.forceUpdate();
+/**
+ * Clear all test styles from element-1
+ */
+function clearElementStyles(el: HTMLElement) {
+  el.style.margin = '';
+  el.style.padding = '';
+  el.style.border = '';
+  el.style.borderRadius = '';
+  el.style.boxSizing = '';
+  el.style.transform = '';
+  el.style.transformOrigin = '';
+  el.style.opacity = '';
+}
+
+// ==================== Hover mode state ====================
+
+let hoverMode = false;
+let pendingStyles: Record<string, boolean> | null = null;
+let hoverEnterHandler: (() => void) | null = null;
+let hoverLeaveHandler: (() => void) | null = null;
+
+function attachHoverListeners(el: HTMLElement) {
+  if (hoverEnterHandler) return; // already attached
+
+  hoverEnterHandler = () => {
+    if (pendingStyles) {
+      setElementStyles(el, pendingStyles);
+      tracker.forceUpdate();
+    }
+  };
+  hoverLeaveHandler = () => {
+    clearElementStyles(el);
+    tracker.forceUpdate();
+  };
+
+  el.addEventListener('mouseenter', hoverEnterHandler);
+  el.addEventListener('mouseleave', hoverLeaveHandler);
+}
+
+function detachHoverListeners(el: HTMLElement) {
+  if (hoverEnterHandler) {
+    el.removeEventListener('mouseenter', hoverEnterHandler);
+    hoverEnterHandler = null;
+  }
+  if (hoverLeaveHandler) {
+    el.removeEventListener('mouseleave', hoverLeaveHandler);
+    hoverLeaveHandler = null;
+  }
+}
+
+/**
+ * Apply test styles to element-1 based on host control panel state
+ */
+function applyElementTestStyles(styles: Record<string, boolean>) {
+  const el = document.getElementById('element-1') as HTMLElement;
+  if (!el) return;
+
+  if (styles.hover) {
+    // Hover mode: store styles, clear element, attach listeners
+    pendingStyles = styles;
+    hoverMode = true;
+    clearElementStyles(el);
+    tracker.forceUpdate();
+    attachHoverListeners(el);
+  } else {
+    // Immediate mode: detach listeners, apply styles directly
+    if (hoverMode) {
+      detachHoverListeners(el);
+      hoverMode = false;
+      pendingStyles = null;
+    }
+    setElementStyles(el, styles);
+    tracker.forceUpdate();
+  }
 }
 
 // Listen for control messages from host
