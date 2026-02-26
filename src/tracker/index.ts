@@ -10,6 +10,11 @@ import {
 } from '../shared';
 
 /**
+ * Callback type for additional message listeners
+ */
+export type TrackerMessageListener = (message: TrackerMessage) => void;
+
+/**
  * Options for registering an element
  */
 export interface RegisterOptions {
@@ -54,6 +59,7 @@ export class ElementTracker {
   private scrollHandler: () => void;
   private resizeHandler: () => void;
   private onMessage: ((message: TrackerMessage) => void) | null;
+  private messageListeners: Set<TrackerMessageListener> = new Set();
   private pendingUpdate: number | null = null;
   private isDestroyed = false;
 
@@ -159,6 +165,45 @@ export class ElementTracker {
   }
 
   /**
+   * Add an additional message listener called alongside the primary dispatch.
+   * If elements are already registered, the listener is immediately called
+   * with an 'init' message containing the current state.
+   * Returns an unsubscribe function.
+   */
+  addMessageListener(listener: TrackerMessageListener): () => void {
+    this.messageListeners.add(listener);
+
+    // Auto-replay current state to the new listener
+    if (this.trackedElements.size > 0) {
+      const elements: ElementRect[] = [];
+      for (const tracked of this.trackedElements.values()) {
+        elements.push(this.getElementRect(tracked));
+      }
+      const message: TrackerMessage = {
+        type: MESSAGE_TYPE,
+        action: 'init',
+        elements,
+      };
+      try {
+        listener(message);
+      } catch (error) {
+        console.error('Error in message listener:', error);
+      }
+    }
+
+    return () => {
+      this.messageListeners.delete(listener);
+    };
+  }
+
+  /**
+   * Remove a previously added message listener
+   */
+  removeMessageListener(listener: TrackerMessageListener): void {
+    this.messageListeners.delete(listener);
+  }
+
+  /**
    * Destroy SDK and clean up all resources
    */
   destroy(): void {
@@ -178,6 +223,7 @@ export class ElementTracker {
     this.resizeObserver.disconnect();
     this.intersectionObserver.disconnect();
     this.trackedElements.clear();
+    this.messageListeners.clear();
   }
 
   /**
@@ -485,19 +531,28 @@ export class ElementTracker {
       elements,
     };
 
+    // Primary dispatch
     if (this.onMessage) {
       try {
         this.onMessage(message);
       } catch (error) {
         console.error('Error in onMessage callback:', error);
       }
-      return;
+    } else {
+      try {
+        this.targetWindow.postMessage(message, this.targetOrigin);
+      } catch (error) {
+        console.error('Failed to send message to parent window:', error);
+      }
     }
 
-    try {
-      this.targetWindow.postMessage(message, this.targetOrigin);
-    } catch (error) {
-      console.error('Failed to send message to parent window:', error);
+    // Additional listeners (always called after primary dispatch)
+    for (const listener of this.messageListeners) {
+      try {
+        listener(message);
+      } catch (error) {
+        console.error('Error in message listener:', error);
+      }
     }
   }
 }
