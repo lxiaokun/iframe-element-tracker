@@ -77,6 +77,7 @@ export function createScaleContext(
     iframeScale: { scaleX: 1, scaleY: 1 },
     iframeZoom: { scaleX: 1, scaleY: 1 },
     iframeTransform: { scaleX: 1, scaleY: 1 },
+    iframeTranslate: { left: 0, top: 0 },
     ancestorScale: { scaleX: 1, scaleY: 1 },
     combinedScale: { scaleX: 1, scaleY: 1 },
     iframeMargin: { left: 0, top: 0 },

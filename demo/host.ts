@@ -242,32 +242,72 @@ Object.entries(modeButtons).forEach(([mode, btn]) => {
 const testButtons = {
   margin: document.getElementById('test-margin')!,
   padding: document.getElementById('test-padding')!,
+  border: document.getElementById('test-border')!,
   transform: document.getElementById('test-transform')!,
+  scaleUp: document.getElementById('test-scale-up')!,
+  translate: document.getElementById('test-translate')!,
+  originCenter: document.getElementById('test-origin-center')!,
   zoom: document.getElementById('test-zoom')!,
+  wrapperZoom: document.getElementById('test-wrapper-zoom')!,
   reset: document.getElementById('test-reset')!,
 };
+
+const iframeWrapper = document.querySelector('.iframe-wrapper') as HTMLElement;
 
 // Track active test states
 const testStates = {
   margin: false,
   padding: false,
+  border: false,
   transform: false,
+  scaleUp: false,
+  translate: false,
+  originCenter: false,
   zoom: false,
+  wrapperZoom: false,
 };
+
+// Transform-type buttons are mutually exclusive (they all set iframe.style.transform)
+const transformKeys = ['transform', 'scaleUp', 'translate', 'originCenter'] as const;
 
 function updateTestButtonStates() {
   testButtons.margin.classList.toggle('active', testStates.margin);
   testButtons.padding.classList.toggle('active', testStates.padding);
+  testButtons.border.classList.toggle('active', testStates.border);
   testButtons.transform.classList.toggle('active', testStates.transform);
+  testButtons.scaleUp.classList.toggle('active', testStates.scaleUp);
+  testButtons.translate.classList.toggle('active', testStates.translate);
+  testButtons.originCenter.classList.toggle('active', testStates.originCenter);
   testButtons.zoom.classList.toggle('active', testStates.zoom);
+  testButtons.wrapperZoom.classList.toggle('active', testStates.wrapperZoom);
 }
 
 function applyTestStyles() {
   iframe.style.margin = testStates.margin ? '20px' : '';
   iframe.style.padding = testStates.padding ? '15px' : '';
-  iframe.style.transform = testStates.transform ? 'scale(0.8)' : '';
-  iframe.style.transformOrigin = testStates.transform ? 'top left' : '';
+  iframe.style.borderWidth = testStates.border ? '8px' : '';
   iframe.style.zoom = testStates.zoom ? '0.8' : '';
+
+  // Determine transform and transformOrigin from mutually exclusive transform buttons
+  if (testStates.transform) {
+    iframe.style.transform = 'scale(0.8)';
+    iframe.style.transformOrigin = 'top left';
+  } else if (testStates.scaleUp) {
+    iframe.style.transform = 'scale(1.2)';
+    iframe.style.transformOrigin = 'top left';
+  } else if (testStates.translate) {
+    iframe.style.transform = 'translate(30px, 20px)';
+    iframe.style.transformOrigin = '';
+  } else if (testStates.originCenter) {
+    iframe.style.transform = 'scale(0.8)';
+    iframe.style.transformOrigin = 'center';
+  } else {
+    iframe.style.transform = '';
+    iframe.style.transformOrigin = '';
+  }
+
+  // Wrapper zoom applies to the ancestor element
+  iframeWrapper.style.zoom = testStates.wrapperZoom ? '0.9' : '';
 
   // Force update overlays
   if (iframe.contentWindow && (iframe.contentWindow as any).tracker) {
@@ -287,11 +327,29 @@ testButtons.padding.addEventListener('click', () => {
   applyTestStyles();
 });
 
-testButtons.transform.addEventListener('click', () => {
-  testStates.transform = !testStates.transform;
+testButtons.border.addEventListener('click', () => {
+  testStates.border = !testStates.border;
   updateTestButtonStates();
   applyTestStyles();
 });
+
+// Transform-type buttons: mutually exclusive
+function toggleTransformButton(key: (typeof transformKeys)[number]) {
+  const wasActive = testStates[key];
+  // Deactivate all transform buttons
+  for (const k of transformKeys) {
+    testStates[k] = false;
+  }
+  // Toggle the clicked one
+  testStates[key] = !wasActive;
+  updateTestButtonStates();
+  applyTestStyles();
+}
+
+testButtons.transform.addEventListener('click', () => toggleTransformButton('transform'));
+testButtons.scaleUp.addEventListener('click', () => toggleTransformButton('scaleUp'));
+testButtons.translate.addEventListener('click', () => toggleTransformButton('translate'));
+testButtons.originCenter.addEventListener('click', () => toggleTransformButton('originCenter'));
 
 testButtons.zoom.addEventListener('click', () => {
   testStates.zoom = !testStates.zoom;
@@ -299,11 +357,22 @@ testButtons.zoom.addEventListener('click', () => {
   applyTestStyles();
 });
 
+testButtons.wrapperZoom.addEventListener('click', () => {
+  testStates.wrapperZoom = !testStates.wrapperZoom;
+  updateTestButtonStates();
+  applyTestStyles();
+});
+
 testButtons.reset.addEventListener('click', () => {
   testStates.margin = false;
   testStates.padding = false;
+  testStates.border = false;
   testStates.transform = false;
+  testStates.scaleUp = false;
+  testStates.translate = false;
+  testStates.originCenter = false;
   testStates.zoom = false;
+  testStates.wrapperZoom = false;
   updateTestButtonStates();
   applyTestStyles();
 });

@@ -73,7 +73,11 @@ export class OverlayPositioner {
       height: dimensions.height,
       borderRadius,
       transform: styles.transform,
-      transformOrigin: styles.transformOrigin,
+      transformOrigin: this.scaleTransformOrigin(
+        styles.transformOrigin,
+        context.iframeScale.scaleX,
+        context.iframeScale.scaleY
+      ),
     };
   }
 
@@ -119,7 +123,7 @@ export class OverlayPositioner {
    * Useful when you need to perform custom calculations or batch operations.
    */
   getScaleContext(): ScaleContext {
-    const { zoom: iframeZoom, transform: iframeTransform } = this.getIframeScaleSeparate();
+    const { zoom: iframeZoom, transform: iframeTransform, translate: iframeTranslate } = this.getIframeScaleSeparate();
     const iframeScale = {
       scaleX: iframeZoom.scaleX * iframeTransform.scaleX,
       scaleY: iframeZoom.scaleY * iframeTransform.scaleY,
@@ -133,6 +137,7 @@ export class OverlayPositioner {
       iframeScale,
       iframeZoom,
       iframeTransform,
+      iframeTranslate,
       ancestorScale,
       combinedScale: {
         scaleX: iframeScale.scaleX * ancestorScale.scaleX,
@@ -147,14 +152,18 @@ export class OverlayPositioner {
   /**
    * Get iframe's zoom and transform scale factors separately.
    * CSS zoom affects margin, but transform does not.
+   * Also computes the effective translate from the transform matrix
+   * and transform-origin offset.
    */
-  getIframeScaleSeparate(): { zoom: Scale2D; transform: Scale2D } {
+  getIframeScaleSeparate(): { zoom: Scale2D; transform: Scale2D; translate: Offset2D } {
     const style = window.getComputedStyle(this.iframe);
     const transformStr = style.transform;
     const zoomVal = parseFloat(style.zoom) || 1;
 
     const zoom = { scaleX: zoomVal, scaleY: zoomVal };
     const transform = { scaleX: 1, scaleY: 1 };
+    let matrixTranslateX = 0;
+    let matrixTranslateY = 0;
 
     if (transformStr && transformStr !== 'none') {
       const matrixMatch = transformStr.match(/^matrix\((.+)\)$/);
@@ -163,10 +172,32 @@ export class OverlayPositioner {
         // matrix(scaleX, skewY, skewX, scaleY, translateX, translateY)
         transform.scaleX = values[0];
         transform.scaleY = values[3];
+        matrixTranslateX = values[4] || 0;
+        matrixTranslateY = values[5] || 0;
       }
     }
 
-    return { zoom, transform };
+    // Compute the visual translate from transform-origin.
+    // The browser's computed matrix does NOT include origin-induced offset.
+    // For transform-origin (ox, oy) with scale (sx, sy), the effective
+    // visual offset is: ((1-sx)*ox, (1-sy)*oy)
+    let originOffsetX = 0;
+    let originOffsetY = 0;
+    if (transformStr && transformStr !== 'none') {
+      const originStr = style.transformOrigin; // e.g. "400px 250px"
+      const originParts = originStr.split(' ');
+      const originX = parseFloat(originParts[0]) || 0;
+      const originY = parseFloat(originParts[1]) || 0;
+      originOffsetX = (1 - transform.scaleX) * originX;
+      originOffsetY = (1 - transform.scaleY) * originY;
+    }
+
+    const translate = {
+      left: matrixTranslateX + originOffsetX,
+      top: matrixTranslateY + originOffsetY,
+    };
+
+    return { zoom, transform, translate };
   }
 
   /**
@@ -274,6 +305,38 @@ export class OverlayPositioner {
   }
 
   /**
+   * Scale a transform-origin value by iframe scale factors.
+   * Computed transform-origin is always in "Xpx Ypx" format.
+   * Pixel values need scaling since the overlay is smaller/larger than the
+   * original element; percentage values are preserved as-is.
+   *
+   * @param transformOrigin - Transform origin string from ElementRect.styles
+   * @param scaleX - Horizontal scale factor (typically iframeScale.scaleX)
+   * @param scaleY - Vertical scale factor (typically iframeScale.scaleY)
+   */
+  scaleTransformOrigin(
+    transformOrigin: string,
+    scaleX: number,
+    scaleY: number
+  ): string {
+    const parts = transformOrigin.split(' ');
+    const scaleValue = (value: string, scale: number): string => {
+      if (value.endsWith('%')) {
+        return value;
+      }
+      const num = parseFloat(value);
+      if (isNaN(num)) {
+        // Keyword values (center, top, left, etc.) - preserve as-is
+        return value;
+      }
+      return `${num * scale}px`;
+    };
+    const x = parts[0] ? scaleValue(parts[0], scaleX) : '0px';
+    const y = parts[1] ? scaleValue(parts[1], scaleY) : '0px';
+    return `${x} ${y}`;
+  }
+
+  /**
    * Transform iframe coordinates to overlay container CSS coordinates.
    * This performs the full multi-stage coordinate transform.
    *
@@ -303,13 +366,25 @@ export class OverlayPositioner {
       y: ctx.iframeZoom.scaleY * ctx.ancestorScale.scaleY,
     };
 
+    // Translate from iframe's CSS transform (e.g., translate(30px, 20px) or
+    // the translate component from transform-origin != top left with scale).
+    // The translate is in the iframe's own coordinate space and gets scaled
+    // by zoom and ancestor scale (but not by transform scale, since it's part
+    // of the transform itself).
+    const translateRendered = {
+      x: ctx.iframeTranslate.left * ctx.iframeZoom.scaleX * ctx.ancestorScale.scaleX,
+      y: ctx.iframeTranslate.top * ctx.iframeZoom.scaleY * ctx.ancestorScale.scaleY,
+    };
+
     // Element's rendered position relative to wrapper (in host pixels):
     const elementRenderedPos = {
       x:
         ctx.iframeMargin.left * marginScale.x +
+        translateRendered.x +
         (ctx.iframeBorderPadding.left + iframeX) * ctx.combinedScale.scaleX,
       y:
         ctx.iframeMargin.top * marginScale.y +
+        translateRendered.y +
         (ctx.iframeBorderPadding.top + iframeY) * ctx.combinedScale.scaleY,
     };
 

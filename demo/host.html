@@ -67,6 +67,26 @@
       color: #fff;
     }
 
+    /* Button group for mutually exclusive options */
+    .btn-group {
+      display: flex;
+      gap: 0;
+    }
+
+    .btn-group button {
+      border-radius: 0;
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .btn-group button:first-child {
+      border-radius: 6px 0 0 6px;
+    }
+
+    .btn-group button:last-child {
+      border-radius: 0 6px 6px 0;
+      border-right: none;
+    }
+
     /* iframe 容器 */
     .iframe-wrapper {
       position: relative;
@@ -247,8 +267,15 @@
     <label>Test iframe styles:</label>
     <button id="test-margin">Margin</button>
     <button id="test-padding">Padding</button>
-    <button id="test-transform">Transform</button>
+    <button id="test-border">Border</button>
+    <div class="btn-group">
+      <button id="test-transform">Transform</button>
+      <button id="test-scale-up">Scale Up</button>
+      <button id="test-translate">Translate</button>
+      <button id="test-origin-center">Origin Center</button>
+    </div>
     <button id="test-zoom">Zoom</button>
+    <button id="test-wrapper-zoom">Wrapper Zoom</button>
     <button id="test-reset">Reset All</button>
   </div>
 

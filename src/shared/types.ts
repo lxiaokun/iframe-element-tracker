@@ -180,6 +180,8 @@ export interface ScaleContext {
   iframeZoom: Scale2D;
   /** Scale factor from iframe's CSS transform only (does not affect margin) */
   iframeTransform: Scale2D;
+  /** Translate offset from iframe's CSS transform (in host pixels) */
+  iframeTranslate: Offset2D;
   /** Scale factor from ancestor transforms/zoom */
   ancestorScale: Scale2D;
   /** Combined scale (iframe * ancestor) */

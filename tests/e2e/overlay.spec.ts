@@ -59,6 +59,93 @@ test.describe('Overlay E2E', () => {
     await verifyOverlayAlignment(page, ['element-1', 'element-2']);
   });
 
+  test('overlays align after toggling Padding', async ({ page }) => {
+    await page.click('#test-padding');
+    await waitForOverlayUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1', 'element-2']);
+  });
+
+  test('overlays align after toggling Transform + Zoom', async ({ page }) => {
+    await page.click('#test-transform');
+    await page.click('#test-zoom');
+    await waitForOverlayUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1', 'element-2']);
+  });
+
+  test('overlays align after toggling Padding + Margin', async ({ page }) => {
+    await page.click('#test-padding');
+    await page.click('#test-margin');
+    await waitForOverlayUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1', 'element-2']);
+  });
+
+  test('overlays align after toggling all four: Margin + Padding + Transform + Zoom', async ({ page }) => {
+    await page.click('#test-margin');
+    await page.click('#test-padding');
+    await page.click('#test-transform');
+    await page.click('#test-zoom');
+    await waitForOverlayUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1', 'element-2']);
+  });
+
+  test('overlays align after toggling Border', async ({ page }) => {
+    await page.click('#test-border');
+    await waitForOverlayUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1', 'element-2']);
+  });
+
+  test('overlays align after toggling Scale Up', async ({ page }) => {
+    await page.click('#test-scale-up');
+    await waitForOverlayUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1', 'element-2']);
+  });
+
+  test('overlays align after toggling Translate', async ({ page }) => {
+    await page.click('#test-translate');
+    await waitForOverlayUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1', 'element-2']);
+  });
+
+  test('overlays align after toggling Origin Center', async ({ page }) => {
+    await page.click('#test-origin-center');
+    await waitForOverlayUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1', 'element-2']);
+  });
+
+  test('overlays align after toggling Wrapper Zoom', async ({ page }) => {
+    await page.click('#test-wrapper-zoom');
+    await waitForOverlayUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1', 'element-2']);
+  });
+
+  test('overlays align after toggling Border + Padding', async ({ page }) => {
+    await page.click('#test-border');
+    await page.click('#test-padding');
+    await waitForOverlayUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1', 'element-2']);
+  });
+
+  test('overlays align after toggling Scale Up + Zoom', async ({ page }) => {
+    await page.click('#test-scale-up');
+    await page.click('#test-zoom');
+    await waitForOverlayUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1', 'element-2']);
+  });
+
+  test('overlays align after toggling Wrapper Zoom + Zoom', async ({ page }) => {
+    await page.click('#test-wrapper-zoom');
+    await page.click('#test-zoom');
+    await waitForOverlayUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1', 'element-2']);
+  });
+
+  test('overlays align after toggling Translate + Margin', async ({ page }) => {
+    await page.click('#test-translate');
+    await page.click('#test-margin');
+    await waitForOverlayUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1', 'element-2']);
+  });
+
   test('Reset All restores default state', async ({ page }) => {
     // Apply some styles
     await page.click('#test-margin');
@@ -144,13 +231,14 @@ async function getOverlayTop(page: Page, elementId: string): Promise<number> {
  *
  * Strategy: Compare the overlay's getBoundingClientRect in the host page with
  * the expected position computed from the iframe's position and the element's
- * position within the iframe (accounting for iframe scale from zoom/transform).
+ * position within the iframe (accounting for iframe scale from zoom/transform
+ * and ancestor zoom).
  *
  * When iframe has zoom or transform:
  * - iframe.getBoundingClientRect() in host page already reflects the scaled size
- * - iframe.clientLeft/clientTop give the border offset in host coordinates
+ * - iframe.clientLeft/clientTop give the border offset in CSS pixels
  * - Element's position within iframe (elemRect.x/y) must be scaled by the
- *   iframe's zoom * transform to get host page pixels
+ *   iframe's zoom * transform * ancestorZoom to get host page pixels
  */
 async function verifyOverlayAlignment(
   page: Page,
@@ -179,6 +267,18 @@ async function verifyOverlayAlignment(
         const scaleX = zoomVal * transformScaleX;
         const scaleY = zoomVal * transformScaleY;
 
+        // Get ancestor zoom (walk up from iframe's parent)
+        let ancestorZoomX = 1;
+        let ancestorZoomY = 1;
+        let ancestor: HTMLElement | null = iframe.parentElement;
+        while (ancestor && ancestor !== document.body) {
+          const aStyle = window.getComputedStyle(ancestor);
+          const aZoom = parseFloat(aStyle.zoom) || 1;
+          ancestorZoomX *= aZoom;
+          ancestorZoomY *= aZoom;
+          ancestor = ancestor.parentElement;
+        }
+
         // Get element bounds from within iframe
         const iframeDoc = iframe.contentDocument;
         if (!iframeDoc) return null;
@@ -186,32 +286,23 @@ async function verifyOverlayAlignment(
         if (!element) return null;
         const elemRect = element.getBoundingClientRect();
 
-        // Calculate expected position in host viewport:
-        // iframeRect.left already includes the margin (scaled by zoom for the host)
-        // clientLeft is the border width in CSS pixels (already scaled in iframeRect)
-        // The content area starts at iframeRect.left + clientLeft * scaleX
-        // But actually, iframe.clientLeft gives border in the iframe's own CSS pixels.
-        // Under zoom, the rendered border = borderCSSPx * zoom (but clientLeft stays same CSS value)
-        // Under transform, the rendered border = borderCSSPx * transform * zoom
-        // So border rendered = iframe.clientLeft * scaleX
-        //
-        // Similarly, padding from computed style is in CSS pixels:
         const paddingLeft = parseFloat(iframeStyle.paddingLeft) || 0;
         const paddingTop = parseFloat(iframeStyle.paddingTop) || 0;
 
-        // The content area rendered offset from iframeRect edge:
-        const contentOffsetX = (iframe.clientLeft + paddingLeft) * scaleX;
-        const contentOffsetY = (iframe.clientTop + paddingTop) * scaleY;
+        // The content area rendered offset from iframeRect edge (in host pixels):
+        // clientLeft/clientTop (border) + padding, scaled by iframeScale * ancestorZoom
+        const contentOffsetX = (iframe.clientLeft + paddingLeft) * scaleX * ancestorZoomX;
+        const contentOffsetY = (iframe.clientTop + paddingTop) * scaleY * ancestorZoomY;
 
         // Element's rendered position within content area (in host pixels):
-        const elemRenderedX = elemRect.x * scaleX;
-        const elemRenderedY = elemRect.y * scaleY;
+        const elemRenderedX = elemRect.x * scaleX * ancestorZoomX;
+        const elemRenderedY = elemRect.y * scaleY * ancestorZoomY;
 
         // Expected overlay position in host viewport:
         const expectedLeft = iframeRect.left + contentOffsetX + elemRenderedX;
         const expectedTop = iframeRect.top + contentOffsetY + elemRenderedY;
-        const expectedWidth = elemRect.width * scaleX;
-        const expectedHeight = elemRect.height * scaleY;
+        const expectedWidth = elemRect.width * scaleX * ancestorZoomX;
+        const expectedHeight = elemRect.height * scaleY * ancestorZoomY;
 
         // Get overlay bounding rect in host viewport
         const overlay = document.querySelector(
