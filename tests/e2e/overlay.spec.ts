@@ -478,19 +478,17 @@ test.describe('Inner Overlay E2E', () => {
         return container && container.children.length >= count;
       },
       TRACKED_ELEMENT_COUNT,
-      { timeout: 10000 }
+      { timeout: 15000 }
     );
   });
 
   test('inner overlay appears after enabling labeled mode', async ({ page }) => {
     // Click Inner Overlay "Labeled" button
     await page.click('#inner-mode-labeled');
-    await page.waitForTimeout(500);
 
-    // Verify overlays exist inside iframe
+    // Wait for inner overlays to be created inside iframe
     const iframe = page.frameLocator('#inner-frame');
-    const innerOverlayCount = await iframe.locator('#overlay-container > div').count();
-    expect(innerOverlayCount).toBe(TRACKED_ELEMENT_COUNT);
+    await expect(iframe.locator('#overlay-container > div')).toHaveCount(TRACKED_ELEMENT_COUNT, { timeout: 5000 });
 
     // Verify labeled class is applied (some elements may be offscreen with display:none)
     const labeledCount = await iframe.locator('#overlay-container .overlay-labeled').count();
@@ -504,39 +502,38 @@ test.describe('Inner Overlay E2E', () => {
   test('inner overlay is removed after switching to off', async ({ page }) => {
     // Enable inner overlay
     await page.click('#inner-mode-labeled');
-    await page.waitForTimeout(500);
 
+    // Wait for inner overlays to appear
     const iframe = page.frameLocator('#inner-frame');
-    expect(await iframe.locator('#overlay-container > div').count()).toBe(TRACKED_ELEMENT_COUNT);
+    await expect(iframe.locator('#overlay-container > div')).toHaveCount(TRACKED_ELEMENT_COUNT, { timeout: 5000 });
 
     // Disable inner overlay
     await page.click('#inner-mode-off');
-    await page.waitForTimeout(300);
 
-    expect(await iframe.locator('#overlay-container > div').count()).toBe(0);
+    // Wait for inner overlays to be removed
+    await expect(iframe.locator('#overlay-container > div')).toHaveCount(0, { timeout: 5000 });
   });
 
   test('host overlay and inner overlay can coexist', async ({ page }) => {
     // Enable inner overlay
     await page.click('#inner-mode-passthrough');
-    await page.waitForTimeout(500);
+
+    // Wait for inner overlays to be created
+    const iframe = page.frameLocator('#inner-frame');
+    await expect(iframe.locator('#overlay-container > div')).toHaveCount(TRACKED_ELEMENT_COUNT, { timeout: 5000 });
 
     // Verify host overlays still exist
     const hostOverlayCount = await page.locator('#overlay-container > div').count();
     expect(hostOverlayCount).toBe(TRACKED_ELEMENT_COUNT);
-
-    // Verify inner overlays also exist
-    const iframe = page.frameLocator('#inner-frame');
-    const innerOverlayCount = await iframe.locator('#overlay-container > div').count();
-    expect(innerOverlayCount).toBe(TRACKED_ELEMENT_COUNT);
   });
 
   test('inner overlay aligns with iframe elements', async ({ page }) => {
     // Enable inner overlay in passthrough mode
     await page.click('#inner-mode-passthrough');
-    await page.waitForTimeout(500);
 
+    // Wait for inner overlays to be created
     const iframe = page.frameLocator('#inner-frame');
+    await expect(iframe.locator('#overlay-container > div')).toHaveCount(TRACKED_ELEMENT_COUNT, { timeout: 5000 });
 
     // Verify alignment for a few elements
     for (const elementId of ['element-1', 'element-2', 'element-3']) {

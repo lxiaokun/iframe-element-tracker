@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Host Page - Overlay Demo</title>
+  <title>Host Page - iframe-element-tracker Demo</title>
   <style>
     * {
       box-sizing: border-box;
@@ -24,10 +24,27 @@
       color: #fff;
     }
 
+    /* Two-column layout */
+    .main-layout {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+    }
+
+    .sidebar {
+      width: 500px;
+      flex-shrink: 0;
+    }
+
+    .content {
+      flex: 1;
+      min-width: 0;
+    }
+
     /* 控制面板 */
     .control-panel {
       background: #16213e;
-      padding: 15px 20px;
+      padding: 12px 15px;
       border-radius: 8px;
       margin-bottom: 20px;
       display: flex;
@@ -42,12 +59,19 @@
       margin-right: 10px;
     }
 
+    .panel-help {
+      width: 100%;
+      font-size: 12px;
+      color: #666;
+      margin: -4px 0 4px 0;
+    }
+
     .control-panel button {
-      padding: 8px 16px;
+      padding: 5px 10px;
       border: none;
       border-radius: 6px;
       cursor: pointer;
-      font-size: 14px;
+      font-size: 12px;
       transition: all 0.2s;
     }
 
@@ -118,10 +142,7 @@
     /* iframe 容器 */
     .iframe-wrapper {
       position: relative;
-      width: calc(100% - 40px);
-      max-width: 800px;
       height: 500px;
-      margin: 0 auto;
       overflow: visible;
     }
 
@@ -150,9 +171,6 @@
       padding: 15px 20px;
       border-radius: 8px;
       margin-top: 20px;
-      max-width: 800px;
-      margin-left: auto;
-      margin-right: auto;
     }
 
     .status-panel h2 {
@@ -280,71 +298,81 @@
   </style>
 </head>
 <body>
-  <h1>Overlay SDK Demo</h1>
+  <h1>iframe-element-tracker Demo</h1>
 
-  <div class="control-panel">
-    <label>Overlay Mode:</label>
-    <button id="mode-off">Off</button>
-    <button id="mode-passthrough" class="active">Passthrough</button>
-    <button id="mode-interactive">Interactive</button>
-    <button id="mode-labeled">Labeled</button>
-    <button id="mode-rich">Rich</button>
-  </div>
+  <div class="main-layout">
+    <aside class="sidebar">
+      <div class="control-panel">
+        <label>Host Overlay</label>
+        <p class="panel-help">Overlay rendering mode for elements tracked across the iframe boundary, rendered in the host page.</p>
+        <button id="mode-off">Off</button>
+        <button id="mode-passthrough" class="active">Passthrough</button>
+        <button id="mode-interactive">Interactive</button>
+        <button id="mode-labeled">Labeled</button>
+        <button id="mode-rich">Rich</button>
+      </div>
 
-  <div class="control-panel">
-    <label>Test iframe styles:</label>
-    <button id="test-margin">Margin</button>
-    <button id="test-padding">Padding</button>
-    <button id="test-border">Border</button>
-    <div class="btn-group">
-      <button id="test-transform">Scale Down</button>
-      <button id="test-scale-up">Scale Up</button>
-      <button id="test-translate">Translate</button>
-      <button id="test-origin-center">Origin Center</button>
-    </div>
-    <button id="test-zoom">Zoom</button>
-    <button id="test-wrapper-zoom">Wrapper Zoom</button>
-    <button id="test-reset">Reset All</button>
-  </div>
+      <div class="control-panel">
+        <label>Inner Overlay</label>
+        <p class="panel-help">Overlay rendering mode for same-page tracking inside the iframe (uses addMessageListener).</p>
+        <button id="inner-mode-off" class="active">Off</button>
+        <button id="inner-mode-passthrough">Passthrough</button>
+        <button id="inner-mode-interactive">Interactive</button>
+        <button id="inner-mode-labeled">Labeled</button>
+        <button id="inner-mode-rich">Rich</button>
+      </div>
 
-  <div class="control-panel">
-    <label>Test element styles:</label>
-    <span class="toggle-divider"></span>
-    <button id="elem-test-hover" class="mode-toggle">Hover</button>
-    <span class="toggle-divider"></span>
-    <button id="elem-test-margin">Margin</button>
-    <button id="elem-test-padding">Padding</button>
-    <button id="elem-test-border">Border</button>
-    <button id="elem-test-border-radius">Border Radius</button>
-    <button id="elem-test-box-sizing">Box Sizing</button>
-    <div class="btn-group">
-      <button id="elem-test-scale">Scale</button>
-      <button id="elem-test-rotate">Rotate</button>
-    </div>
-    <button id="elem-test-opacity">Opacity</button>
-    <button id="elem-test-pseudo">::before/after</button>
-    <button id="elem-test-reset">Reset All</button>
-  </div>
+      <div class="control-panel">
+        <label>Iframe Styles</label>
+        <p class="panel-help">Toggle CSS properties on the iframe container to test overlay alignment under transforms, zoom, and layout changes.</p>
+        <button id="test-margin">Margin</button>
+        <button id="test-padding">Padding</button>
+        <button id="test-border">Border</button>
+        <div class="btn-group">
+          <button id="test-transform">Scale Down</button>
+          <button id="test-scale-up">Scale Up</button>
+          <button id="test-translate">Translate</button>
+          <button id="test-origin-center">Origin Center</button>
+        </div>
+        <button id="test-zoom">Zoom</button>
+        <button id="test-wrapper-zoom">Wrapper Zoom</button>
+        <button id="test-reset">Reset All</button>
+      </div>
 
-  <div class="control-panel">
-    <label>Inner Overlay:</label>
-    <button id="inner-mode-off" class="active">Off</button>
-    <button id="inner-mode-passthrough">Passthrough</button>
-    <button id="inner-mode-interactive">Interactive</button>
-    <button id="inner-mode-labeled">Labeled</button>
-    <button id="inner-mode-rich">Rich</button>
-  </div>
+      <div class="control-panel">
+        <label>Element Styles</label>
+        <p class="panel-help">Toggle CSS properties on Element 1 inside the iframe. "Hover" mode defers changes until mouse enters the element.</p>
+        <span class="toggle-divider"></span>
+        <button id="elem-test-hover" class="mode-toggle">Hover</button>
+        <span class="toggle-divider"></span>
+        <button id="elem-test-margin">Margin</button>
+        <button id="elem-test-padding">Padding</button>
+        <button id="elem-test-border">Border</button>
+        <button id="elem-test-border-radius">Border Radius</button>
+        <button id="elem-test-box-sizing">Box Sizing</button>
+        <div class="btn-group">
+          <button id="elem-test-scale">Scale</button>
+          <button id="elem-test-rotate">Rotate</button>
+        </div>
+        <button id="elem-test-opacity">Opacity</button>
+        <button id="elem-test-pseudo">::before/after</button>
+        <button id="elem-test-reset">Reset All</button>
+      </div>
+    </aside>
 
-  <div class="iframe-wrapper">
-    <iframe id="inner-frame" src="./inner.html"></iframe>
-    <div class="overlay-container" id="overlay-container"></div>
-  </div>
+    <main class="content">
+      <div class="iframe-wrapper">
+        <iframe id="inner-frame" src="./inner.html"></iframe>
+        <div class="overlay-container" id="overlay-container"></div>
+      </div>
 
-  <div class="status-panel">
-    <h2>Tracked Elements Status</h2>
-    <div class="status-content" id="status-content">
-      <p>Waiting for iframe to load...</p>
-    </div>
+      <div class="status-panel">
+        <h2>Tracked Elements Status</h2>
+        <div class="status-content" id="status-content">
+          <p>Waiting for iframe to load...</p>
+        </div>
+      </div>
+    </main>
   </div>
 
   <script type="module" src="./host.ts"></script>
