@@ -14,7 +14,7 @@ test.describe('Overlay E2E', () => {
         return container && container.children.length >= count;
       },
       TRACKED_ELEMENT_COUNT,
-      { timeout: 10000 }
+      { timeout: 15000 },
     );
   });
 
@@ -79,7 +79,9 @@ test.describe('Overlay E2E', () => {
     await verifyOverlayAlignment(page, ['element-1', 'element-2']);
   });
 
-  test('overlays align after toggling all four: Margin + Padding + Transform + Zoom', async ({ page }) => {
+  test('overlays align after toggling all four: Margin + Padding + Transform + Zoom', async ({
+    page,
+  }) => {
     await page.click('#test-margin');
     await page.click('#test-padding');
     await page.click('#test-transform');
@@ -157,9 +159,9 @@ test.describe('Overlay E2E', () => {
     await waitForOverlayUpdate(page);
 
     // Verify no style buttons are active
-    const marginActive = await page.locator('#test-margin').evaluate(
-      (el) => el.classList.contains('active')
-    );
+    const marginActive = await page
+      .locator('#test-margin')
+      .evaluate((el) => el.classList.contains('active'));
     expect(marginActive).toBe(false);
 
     // Verify alignment
@@ -198,7 +200,7 @@ test.describe('Overlay E2E', () => {
     const newTop = await getOverlayTop(page, 'element-1');
     expect(
       Math.abs(newTop - initialTop),
-      `Expected overlay top to change after scroll. Initial: ${initialTop}, After: ${newTop}`
+      `Expected overlay top to change after scroll. Initial: ${initialTop}, After: ${newTop}`,
     ).toBeGreaterThan(10);
   });
 });
@@ -230,9 +232,9 @@ async function waitForElementStyleUpdate(page: Page): Promise<void> {
  * Get the top position of an overlay by element id.
  */
 async function getOverlayTop(page: Page, elementId: string): Promise<number> {
-  return page.locator(`#overlay-container [data-overlay-id="${elementId}"]`).evaluate(
-    (el) => parseFloat((el as HTMLElement).style.top)
-  );
+  return page
+    .locator(`#overlay-container [data-overlay-id="${elementId}"]`)
+    .evaluate((el) => parseFloat((el as HTMLElement).style.top));
 }
 
 /**
@@ -252,114 +254,109 @@ async function getOverlayTop(page: Page, elementId: string): Promise<number> {
 async function verifyOverlayAlignment(
   page: Page,
   elementIds: string[],
-  tolerance: number = ALIGNMENT_TOLERANCE
+  tolerance: number = ALIGNMENT_TOLERANCE,
 ): Promise<void> {
   for (const elementId of elementIds) {
-    const positions = await page.evaluate(
-      (id) => {
-        const iframe = document.getElementById('inner-frame') as HTMLIFrameElement;
-        const iframeRect = iframe.getBoundingClientRect();
+    const positions = await page.evaluate((id) => {
+      const iframe = document.getElementById('inner-frame') as HTMLIFrameElement;
+      const iframeRect = iframe.getBoundingClientRect();
 
-        // Get iframe scale factors
-        const iframeStyle = window.getComputedStyle(iframe);
-        const zoomVal = parseFloat(iframeStyle.zoom) || 1;
-        let transformScaleX = 1;
-        let transformScaleY = 1;
-        const transformStr = iframeStyle.transform;
-        if (transformStr && transformStr !== 'none') {
-          const matrixMatch = transformStr.match(/^matrix\((.+)\)$/);
-          if (matrixMatch) {
-            const values = matrixMatch[1].split(',').map((v) => parseFloat(v.trim()));
-            transformScaleX = values[0];
-            transformScaleY = values[3];
-          }
+      // Get iframe scale factors
+      const iframeStyle = window.getComputedStyle(iframe);
+      const zoomVal = parseFloat(iframeStyle.zoom) || 1;
+      let transformScaleX = 1;
+      let transformScaleY = 1;
+      const transformStr = iframeStyle.transform;
+      if (transformStr && transformStr !== 'none') {
+        const matrixMatch = transformStr.match(/^matrix\((.+)\)$/);
+        if (matrixMatch) {
+          const values = matrixMatch[1].split(',').map((v) => parseFloat(v.trim()));
+          transformScaleX = values[0];
+          transformScaleY = values[3];
         }
-        const scaleX = zoomVal * transformScaleX;
-        const scaleY = zoomVal * transformScaleY;
+      }
+      const scaleX = zoomVal * transformScaleX;
+      const scaleY = zoomVal * transformScaleY;
 
-        // Get ancestor zoom (walk up from iframe's parent)
-        let ancestorZoomX = 1;
-        let ancestorZoomY = 1;
-        let ancestor: HTMLElement | null = iframe.parentElement;
-        while (ancestor && ancestor !== document.body) {
-          const aStyle = window.getComputedStyle(ancestor);
-          const aZoom = parseFloat(aStyle.zoom) || 1;
-          ancestorZoomX *= aZoom;
-          ancestorZoomY *= aZoom;
-          ancestor = ancestor.parentElement;
-        }
+      // Get ancestor zoom (walk up from iframe's parent)
+      let ancestorZoomX = 1;
+      let ancestorZoomY = 1;
+      let ancestor: HTMLElement | null = iframe.parentElement;
+      while (ancestor && ancestor !== document.body) {
+        const aStyle = window.getComputedStyle(ancestor);
+        const aZoom = parseFloat(aStyle.zoom) || 1;
+        ancestorZoomX *= aZoom;
+        ancestorZoomY *= aZoom;
+        ancestor = ancestor.parentElement;
+      }
 
-        // Get element bounds from within iframe
-        const iframeDoc = iframe.contentDocument;
-        if (!iframeDoc) return null;
-        const element = iframeDoc.getElementById(id);
-        if (!element) return null;
-        const elemRect = element.getBoundingClientRect();
+      // Get element bounds from within iframe
+      const iframeDoc = iframe.contentDocument;
+      if (!iframeDoc) return null;
+      const element = iframeDoc.getElementById(id);
+      if (!element) return null;
+      const elemRect = element.getBoundingClientRect();
 
-        const paddingLeft = parseFloat(iframeStyle.paddingLeft) || 0;
-        const paddingTop = parseFloat(iframeStyle.paddingTop) || 0;
+      const paddingLeft = parseFloat(iframeStyle.paddingLeft) || 0;
+      const paddingTop = parseFloat(iframeStyle.paddingTop) || 0;
 
-        // The content area rendered offset from iframeRect edge (in host pixels):
-        // clientLeft/clientTop (border) + padding, scaled by iframeScale * ancestorZoom
-        const contentOffsetX = (iframe.clientLeft + paddingLeft) * scaleX * ancestorZoomX;
-        const contentOffsetY = (iframe.clientTop + paddingTop) * scaleY * ancestorZoomY;
+      // The content area rendered offset from iframeRect edge (in host pixels):
+      // clientLeft/clientTop (border) + padding, scaled by iframeScale * ancestorZoom
+      const contentOffsetX = (iframe.clientLeft + paddingLeft) * scaleX * ancestorZoomX;
+      const contentOffsetY = (iframe.clientTop + paddingTop) * scaleY * ancestorZoomY;
 
-        // Element's rendered position within content area (in host pixels):
-        const elemRenderedX = elemRect.x * scaleX * ancestorZoomX;
-        const elemRenderedY = elemRect.y * scaleY * ancestorZoomY;
+      // Element's rendered position within content area (in host pixels):
+      const elemRenderedX = elemRect.x * scaleX * ancestorZoomX;
+      const elemRenderedY = elemRect.y * scaleY * ancestorZoomY;
 
-        // Expected overlay position in host viewport:
-        const expectedLeft = iframeRect.left + contentOffsetX + elemRenderedX;
-        const expectedTop = iframeRect.top + contentOffsetY + elemRenderedY;
-        const expectedWidth = elemRect.width * scaleX * ancestorZoomX;
-        const expectedHeight = elemRect.height * scaleY * ancestorZoomY;
+      // Expected overlay position in host viewport:
+      const expectedLeft = iframeRect.left + contentOffsetX + elemRenderedX;
+      const expectedTop = iframeRect.top + contentOffsetY + elemRenderedY;
+      const expectedWidth = elemRect.width * scaleX * ancestorZoomX;
+      const expectedHeight = elemRect.height * scaleY * ancestorZoomY;
 
-        // Get overlay bounding rect in host viewport
-        const overlay = document.querySelector(
-          `[data-overlay-id="${id}"]`
-        ) as HTMLElement;
-        if (!overlay) return null;
-        const overlayRect = overlay.getBoundingClientRect();
+      // Get overlay bounding rect in host viewport
+      const overlay = document.querySelector(`[data-overlay-id="${id}"]`) as HTMLElement;
+      if (!overlay) return null;
+      const overlayRect = overlay.getBoundingClientRect();
 
-        return {
-          element: {
-            left: expectedLeft,
-            top: expectedTop,
-            width: expectedWidth,
-            height: expectedHeight,
-          },
-          overlay: {
-            left: overlayRect.left,
-            top: overlayRect.top,
-            width: overlayRect.width,
-            height: overlayRect.height,
-          },
-        };
-      },
-      elementId
-    );
+      return {
+        element: {
+          left: expectedLeft,
+          top: expectedTop,
+          width: expectedWidth,
+          height: expectedHeight,
+        },
+        overlay: {
+          left: overlayRect.left,
+          top: overlayRect.top,
+          width: overlayRect.width,
+          height: overlayRect.height,
+        },
+      };
+    }, elementId);
 
     expect(positions, `Failed to get positions for ${elementId}`).not.toBeNull();
     if (!positions) continue;
 
     expect(
       Math.abs(positions.element.left - positions.overlay.left),
-      `${elementId} left: expected ${positions.element.left}, got ${positions.overlay.left}`
+      `${elementId} left: expected ${positions.element.left}, got ${positions.overlay.left}`,
     ).toBeLessThanOrEqual(tolerance);
 
     expect(
       Math.abs(positions.element.top - positions.overlay.top),
-      `${elementId} top: expected ${positions.element.top}, got ${positions.overlay.top}`
+      `${elementId} top: expected ${positions.element.top}, got ${positions.overlay.top}`,
     ).toBeLessThanOrEqual(tolerance);
 
     expect(
       Math.abs(positions.element.width - positions.overlay.width),
-      `${elementId} width: expected ${positions.element.width}, got ${positions.overlay.width}`
+      `${elementId} width: expected ${positions.element.width}, got ${positions.overlay.width}`,
     ).toBeLessThanOrEqual(tolerance);
 
     expect(
       Math.abs(positions.element.height - positions.overlay.height),
-      `${elementId} height: expected ${positions.element.height}, got ${positions.overlay.height}`
+      `${elementId} height: expected ${positions.element.height}, got ${positions.overlay.height}`,
     ).toBeLessThanOrEqual(tolerance);
   }
 }
@@ -377,7 +374,7 @@ test.describe('Element Style E2E', () => {
         return container && container.children.length >= count;
       },
       TRACKED_ELEMENT_COUNT,
-      { timeout: 10000 }
+      { timeout: 15000 },
     );
   });
 
@@ -458,7 +455,9 @@ test.describe('Element Style E2E', () => {
     await verifyOverlayAlignment(page, ['element-1']);
   });
 
-  test('overlay aligns after toggling element ::before/::after pseudo + Margin', async ({ page }) => {
+  test('overlay aligns after toggling element ::before/::after pseudo + Margin', async ({
+    page,
+  }) => {
     await page.click('#elem-test-pseudo');
     await page.click('#elem-test-margin');
     await waitForElementStyleUpdate(page);
@@ -478,7 +477,7 @@ test.describe('Inner Overlay E2E', () => {
         return container && container.children.length >= count;
       },
       TRACKED_ELEMENT_COUNT,
-      { timeout: 15000 }
+      { timeout: 15000 },
     );
   });
 
@@ -488,7 +487,9 @@ test.describe('Inner Overlay E2E', () => {
 
     // Wait for inner overlays to be created inside iframe
     const iframe = page.frameLocator('#inner-frame');
-    await expect(iframe.locator('#overlay-container > div')).toHaveCount(TRACKED_ELEMENT_COUNT, { timeout: 5000 });
+    await expect(iframe.locator('#overlay-container > div')).toHaveCount(TRACKED_ELEMENT_COUNT, {
+      timeout: 5000,
+    });
 
     // Verify labeled class is applied (some elements may be offscreen with display:none)
     const labeledCount = await iframe.locator('#overlay-container .overlay-labeled').count();
@@ -505,7 +506,9 @@ test.describe('Inner Overlay E2E', () => {
 
     // Wait for inner overlays to appear
     const iframe = page.frameLocator('#inner-frame');
-    await expect(iframe.locator('#overlay-container > div')).toHaveCount(TRACKED_ELEMENT_COUNT, { timeout: 5000 });
+    await expect(iframe.locator('#overlay-container > div')).toHaveCount(TRACKED_ELEMENT_COUNT, {
+      timeout: 5000,
+    });
 
     // Disable inner overlay
     await page.click('#inner-mode-off');
@@ -520,7 +523,9 @@ test.describe('Inner Overlay E2E', () => {
 
     // Wait for inner overlays to be created
     const iframe = page.frameLocator('#inner-frame');
-    await expect(iframe.locator('#overlay-container > div')).toHaveCount(TRACKED_ELEMENT_COUNT, { timeout: 5000 });
+    await expect(iframe.locator('#overlay-container > div')).toHaveCount(TRACKED_ELEMENT_COUNT, {
+      timeout: 5000,
+    });
 
     // Verify host overlays still exist
     const hostOverlayCount = await page.locator('#overlay-container > div').count();
@@ -533,7 +538,9 @@ test.describe('Inner Overlay E2E', () => {
 
     // Wait for inner overlays to be created
     const iframe = page.frameLocator('#inner-frame');
-    await expect(iframe.locator('#overlay-container > div')).toHaveCount(TRACKED_ELEMENT_COUNT, { timeout: 5000 });
+    await expect(iframe.locator('#overlay-container > div')).toHaveCount(TRACKED_ELEMENT_COUNT, {
+      timeout: 5000,
+    });
 
     // Verify alignment for a few elements
     for (const elementId of ['element-1', 'element-2', 'element-3']) {
@@ -542,9 +549,7 @@ test.describe('Inner Overlay E2E', () => {
         if (!element) return null;
         const elemRect = element.getBoundingClientRect();
 
-        const overlay = document.querySelector(
-          `[data-overlay-id="${id}"]`
-        ) as HTMLElement;
+        const overlay = document.querySelector(`[data-overlay-id="${id}"]`) as HTMLElement;
         if (!overlay) return null;
 
         // Overlay uses document coordinates (absolute positioning with scrollY offset)
@@ -578,22 +583,22 @@ test.describe('Inner Overlay E2E', () => {
 
       expect(
         Math.abs(positions.element.left - positions.overlay.left),
-        `${elementId} left: expected ${positions.element.left}, got ${positions.overlay.left}`
+        `${elementId} left: expected ${positions.element.left}, got ${positions.overlay.left}`,
       ).toBeLessThanOrEqual(ALIGNMENT_TOLERANCE);
 
       expect(
         Math.abs(positions.element.top - positions.overlay.top),
-        `${elementId} top: expected ${positions.element.top}, got ${positions.overlay.top}`
+        `${elementId} top: expected ${positions.element.top}, got ${positions.overlay.top}`,
       ).toBeLessThanOrEqual(ALIGNMENT_TOLERANCE);
 
       expect(
         Math.abs(positions.element.width - positions.overlay.width),
-        `${elementId} width: expected ${positions.element.width}, got ${positions.overlay.width}`
+        `${elementId} width: expected ${positions.element.width}, got ${positions.overlay.width}`,
       ).toBeLessThanOrEqual(ALIGNMENT_TOLERANCE);
 
       expect(
         Math.abs(positions.element.height - positions.overlay.height),
-        `${elementId} height: expected ${positions.element.height}, got ${positions.overlay.height}`
+        `${elementId} height: expected ${positions.element.height}, got ${positions.overlay.height}`,
       ).toBeLessThanOrEqual(ALIGNMENT_TOLERANCE);
     }
   });

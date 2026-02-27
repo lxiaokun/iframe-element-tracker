@@ -24,6 +24,7 @@ No need to manually set up ResizeObserver, IntersectionObserver, scroll listener
 ### Comprehensive Change Detection
 
 The SDK automatically monitors and reports:
+
 - Position changes (scroll, layout shifts)
 - Size changes (resize, content changes)
 - Visibility changes (in/out of viewport, hidden by CSS)
@@ -73,7 +74,7 @@ const tracker = new ElementTracker();
 
 // Register elements to track
 tracker.register(document.getElementById('my-element'), 'my-element', {
-  metadata: { label: 'My Element' }
+  metadata: { label: 'My Element' },
 });
 
 // Unregister when done
@@ -93,21 +94,21 @@ const receiver = new ElementReceiver(iframe);
 
 // Listen for element initialization
 receiver.on('init', (elements) => {
-  elements.forEach(el => {
+  elements.forEach((el) => {
     console.log(`Element ${el.id} initialized at (${el.bounds.x}, ${el.bounds.y})`);
   });
 });
 
 // Listen for element updates
 receiver.on('update', (elements) => {
-  elements.forEach(el => {
+  elements.forEach((el) => {
     console.log(`Element ${el.id} moved to (${el.bounds.x}, ${el.bounds.y})`);
   });
 });
 
 // Listen for element removal
 receiver.on('remove', (elements) => {
-  elements.forEach(el => {
+  elements.forEach((el) => {
     console.log(`Element ${el.id} removed`);
   });
 });
@@ -140,7 +141,7 @@ const positioner = new OverlayPositioner({ iframe, container: overlayContainer }
 
 // Simple usage: apply style directly to overlay element
 receiver.on('update', (elements) => {
-  elements.forEach(el => {
+  elements.forEach((el) => {
     const overlay = getOrCreateOverlay(el.id);
     positioner.applyOverlayStyle(overlay, el);
   });
@@ -148,7 +149,7 @@ receiver.on('update', (elements) => {
 
 // Or get style values to apply manually
 receiver.on('update', (elements) => {
-  elements.forEach(el => {
+  elements.forEach((el) => {
     const style = positioner.getOverlayStyle(el);
     if (style) {
       overlay.style.left = `${style.left}px`;
@@ -206,7 +207,7 @@ tracker.register(document.getElementById('my-element')!, 'my-element');
 const receiver = new ElementReceiver(null);
 
 receiver.on('init', (elements) => {
-  elements.forEach(el => {
+  elements.forEach((el) => {
     const overlay = createOverlay(el.id);
     // Use document coordinates for absolute-positioned overlay container
     overlay.style.left = `${el.bounds.x + window.scrollX}px`;
@@ -217,13 +218,11 @@ receiver.on('init', (elements) => {
 });
 
 receiver.on('update', (elements) => {
-  elements.forEach(el => updateOverlayPosition(el));
+  elements.forEach((el) => updateOverlayPosition(el));
 });
 
 // Subscribe — automatically replays current state
-const unsubscribe = tracker.addMessageListener(
-  (msg) => receiver.handleTrackerMessage(msg),
-);
+const unsubscribe = tracker.addMessageListener((msg) => receiver.handleTrackerMessage(msg));
 
 // To stop:
 unsubscribe();
@@ -235,7 +234,9 @@ receiver.destroy();
 For same-page tracking, use an `absolute`-positioned container so body-level scrolling is handled by the browser's compositing layer (zero-delay scroll sync):
 
 ```html
-<div id="overlay-container" style="
+<div
+  id="overlay-container"
+  style="
   position: absolute;
   top: 0;
   left: 0;
@@ -244,7 +245,8 @@ For same-page tracking, use an `absolute`-positioned container so body-level scr
   pointer-events: none;
   overflow: visible;
   z-index: 9999;
-"></div>
+"
+></div>
 ```
 
 ### Coexistence with Cross-iframe Mode
@@ -258,9 +260,7 @@ tracker.register(element, 'my-element');
 
 // Add a same-page receiver alongside the postMessage dispatch
 const localReceiver = new ElementReceiver(null);
-const unsubscribe = tracker.addMessageListener(
-  (msg) => localReceiver.handleTrackerMessage(msg),
-);
+const unsubscribe = tracker.addMessageListener((msg) => localReceiver.handleTrackerMessage(msg));
 // localReceiver automatically receives current state
 
 // To stop same-page overlays:
@@ -281,21 +281,22 @@ new ElementTracker(options?: TrackerOptions)
 ```
 
 **Options:**
+
 - `targetWindow?: Window` - Target window for postMessage (default: `window.parent`)
 - `targetOrigin?: string` - Target origin for postMessage (default: `'*'`)
 - `onMessage?: (message: TrackerMessage) => void` - Direct message callback; when set, bypasses postMessage
 
 #### Methods
 
-| Method | Description |
-|--------|-------------|
-| `register(element, id, options?)` | Register an element for tracking |
-| `unregister(id)` | Stop tracking an element |
-| `updateMetadata(id, metadata)` | Update element's metadata |
-| `forceUpdate()` | Manually trigger an update |
-| `addMessageListener(listener)` | Add a message listener; auto-replays current state (returns unsubscribe function) |
-| `removeMessageListener(listener)` | Remove a previously added message listener |
-| `destroy()` | Clean up all resources |
+| Method                            | Description                                                                       |
+| --------------------------------- | --------------------------------------------------------------------------------- |
+| `register(element, id, options?)` | Register an element for tracking                                                  |
+| `unregister(id)`                  | Stop tracking an element                                                          |
+| `updateMetadata(id, metadata)`    | Update element's metadata                                                         |
+| `forceUpdate()`                   | Manually trigger an update                                                        |
+| `addMessageListener(listener)`    | Add a message listener; auto-replays current state (returns unsubscribe function) |
+| `removeMessageListener(listener)` | Remove a previously added message listener                                        |
+| `destroy()`                       | Clean up all resources                                                            |
 
 ### ElementReceiver
 
@@ -308,22 +309,23 @@ new ElementReceiver(iframe?: HTMLIFrameElement | null, options?: ReceiverOptions
 ```
 
 **Options:**
+
 - `allowedOrigin?: string` - Allowed origin for messages (default: `'*'`)
 
 When `iframe` is `null` or omitted, the receiver operates in same-page mode: it does not listen for `window` message events, and you must feed messages via `handleTrackerMessage()`.
 
 #### Methods
 
-| Method | Description |
-|--------|-------------|
-| `on(event, callback)` | Listen for events ('init', 'update', 'remove') |
-| `off(event, callback)` | Remove event listener |
-| `getElements()` | Get all tracked elements |
-| `getElement(id)` | Get a single element by ID |
-| `getIframe()` | Get the bound iframe element (or `null` in same-page mode) |
-| `getIframeBounds()` | Get iframe's bounding rect (or `null` in same-page mode) |
-| `handleTrackerMessage(message)` | Directly process a TrackerMessage (for same-page mode) |
-| `destroy()` | Clean up all resources |
+| Method                          | Description                                                |
+| ------------------------------- | ---------------------------------------------------------- |
+| `on(event, callback)`           | Listen for events ('init', 'update', 'remove')             |
+| `off(event, callback)`          | Remove event listener                                      |
+| `getElements()`                 | Get all tracked elements                                   |
+| `getElement(id)`                | Get a single element by ID                                 |
+| `getIframe()`                   | Get the bound iframe element (or `null` in same-page mode) |
+| `getIframeBounds()`             | Get iframe's bounding rect (or `null` in same-page mode)   |
+| `handleTrackerMessage(message)` | Directly process a TrackerMessage (for same-page mode)     |
+| `destroy()`                     | Clean up all resources                                     |
 
 ### OverlayPositioner
 
@@ -336,22 +338,23 @@ new OverlayPositioner(options: OverlayPositionerOptions)
 ```
 
 **Options:**
+
 - `iframe: HTMLIFrameElement` - The iframe element
 - `container: HTMLElement` - The overlay container element
 
 #### Methods
 
-| Method | Description |
-|--------|-------------|
-| `applyOverlayStyle(overlay, elementRect)` | Apply calculated style directly to overlay element |
-| `getOverlayStyle(elementRect)` | Get calculated style values (returns `OverlayStyle \| null`) |
-| `getScaleContext()` | Get all scale and offset values for custom calculations |
-| `transformCoordinates(x, y, context?)` | Transform iframe coordinates to CSS left/top |
-| `transformDimensions(width, height, context?)` | Transform dimensions to CSS width/height |
-| `scaleBorderRadius(radius, scale)` | Scale border-radius values |
-| `getIframeScale()` | Get iframe's combined transform/zoom scale |
-| `getIframeScaleSeparate()` | Get iframe's zoom and transform scales separately |
-| `getAncestorScale()` | Get cumulative scale from ancestor elements |
+| Method                                         | Description                                                  |
+| ---------------------------------------------- | ------------------------------------------------------------ |
+| `applyOverlayStyle(overlay, elementRect)`      | Apply calculated style directly to overlay element           |
+| `getOverlayStyle(elementRect)`                 | Get calculated style values (returns `OverlayStyle \| null`) |
+| `getScaleContext()`                            | Get all scale and offset values for custom calculations      |
+| `transformCoordinates(x, y, context?)`         | Transform iframe coordinates to CSS left/top                 |
+| `transformDimensions(width, height, context?)` | Transform dimensions to CSS width/height                     |
+| `scaleBorderRadius(radius, scale)`             | Scale border-radius values                                   |
+| `getIframeScale()`                             | Get iframe's combined transform/zoom scale                   |
+| `getIframeScaleSeparate()`                     | Get iframe's zoom and transform scales separately            |
+| `getAncestorScale()`                           | Get cumulative scale from ancestor elements                  |
 
 ### ElementRect
 
@@ -461,6 +464,69 @@ Then open http://localhost:3000/demo/host.html
 - Firefox 69+
 - Safari 14+
 - Edge 79+
+
+## Development
+
+### Scripts
+
+```bash
+# Start dev server
+npm run dev
+
+# Build library (ESM + CJS + .d.ts)
+npm run build:lib
+
+# Lint code
+npm run lint
+npm run lint:fix    # auto-fix
+
+# Format code
+npm run format
+npm run format:check
+
+# Run unit tests
+npm test
+
+# Run E2E tests
+npm run test:e2e
+
+# Release a new version (interactive)
+npm run release
+
+# Preview release without making changes
+npm run release -- --dry-run
+```
+
+### Release
+
+The project uses [release-it](https://github.com/release-it/release-it) for automated releases. Running `npm run release` will:
+
+1. Run `build:lib` and unit tests as a pre-check
+2. Determine the next version from [Conventional Commits](https://www.conventionalcommits.org/)
+3. Update `package.json` version
+4. Generate/update `CHANGELOG.md`
+5. Create a git commit and tag (`v*.*.*`)
+6. Publish to npm
+
+### Git Hooks
+
+[Husky](https://typicode.github.io/husky/) is configured with two hooks:
+
+- **pre-commit**: Runs [lint-staged](https://github.com/lint-staged/lint-staged) — auto-fixes ESLint and Prettier on staged files
+- **commit-msg**: Validates commit messages follow the [Conventional Commits](https://www.conventionalcommits.org/) format via [commitlint](https://commitlint.js.org/)
+
+Commit message format: `type(scope): description`
+
+- `feat(scope):` — New features
+- `fix(scope):` — Bug fixes
+- `docs(scope):` — Documentation changes
+- `refactor(scope):` — Code refactoring
+- `chore(scope):` — Maintenance tasks
+
+### TODO
+
+- [ ] GitHub Actions CI (lint + type-check + unit tests + E2E tests)
+- [ ] Automated release workflow (tag-triggered npm publish)
 
 ## License
 

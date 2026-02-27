@@ -24,6 +24,7 @@ tracker.register(element, 'my-element');
 ### 全面的变化检测
 
 SDK 自动监控并上报：
+
 - 位置变化（滚动、布局偏移）
 - 尺寸变化（resize、内容变化）
 - 可见性变化（进出视口、CSS 隐藏）
@@ -73,7 +74,7 @@ const tracker = new ElementTracker();
 
 // 注册需要追踪的元素
 tracker.register(document.getElementById('my-element'), 'my-element', {
-  metadata: { label: '我的元素' }
+  metadata: { label: '我的元素' },
 });
 
 // 取消注册
@@ -93,21 +94,21 @@ const receiver = new ElementReceiver(iframe);
 
 // 监听元素初始化
 receiver.on('init', (elements) => {
-  elements.forEach(el => {
+  elements.forEach((el) => {
     console.log(`元素 ${el.id} 初始化于 (${el.bounds.x}, ${el.bounds.y})`);
   });
 });
 
 // 监听元素更新
 receiver.on('update', (elements) => {
-  elements.forEach(el => {
+  elements.forEach((el) => {
     console.log(`元素 ${el.id} 移动到 (${el.bounds.x}, ${el.bounds.y})`);
   });
 });
 
 // 监听元素移除
 receiver.on('remove', (elements) => {
-  elements.forEach(el => {
+  elements.forEach((el) => {
     console.log(`元素 ${el.id} 已移除`);
   });
 });
@@ -140,7 +141,7 @@ const positioner = new OverlayPositioner({ iframe, container: overlayContainer }
 
 // 简单用法：直接将样式应用到覆盖层元素
 receiver.on('update', (elements) => {
-  elements.forEach(el => {
+  elements.forEach((el) => {
     const overlay = getOrCreateOverlay(el.id);
     positioner.applyOverlayStyle(overlay, el);
   });
@@ -148,7 +149,7 @@ receiver.on('update', (elements) => {
 
 // 或获取样式值手动应用
 receiver.on('update', (elements) => {
-  elements.forEach(el => {
+  elements.forEach((el) => {
     const style = positioner.getOverlayStyle(el);
     if (style) {
       overlay.style.left = `${style.left}px`;
@@ -206,7 +207,7 @@ tracker.register(document.getElementById('my-element')!, 'my-element');
 const receiver = new ElementReceiver(null);
 
 receiver.on('init', (elements) => {
-  elements.forEach(el => {
+  elements.forEach((el) => {
     const overlay = createOverlay(el.id);
     // 使用文档坐标（配合 absolute 定位的覆盖层容器）
     overlay.style.left = `${el.bounds.x + window.scrollX}px`;
@@ -217,13 +218,11 @@ receiver.on('init', (elements) => {
 });
 
 receiver.on('update', (elements) => {
-  elements.forEach(el => updateOverlayPosition(el));
+  elements.forEach((el) => updateOverlayPosition(el));
 });
 
 // 订阅——自动回放当前状态
-const unsubscribe = tracker.addMessageListener(
-  (msg) => receiver.handleTrackerMessage(msg),
-);
+const unsubscribe = tracker.addMessageListener((msg) => receiver.handleTrackerMessage(msg));
 
 // 停止时：
 unsubscribe();
@@ -235,7 +234,9 @@ receiver.destroy();
 同页模式下，使用 `absolute` 定位的容器，这样 body 级别的滚动由浏览器合成层处理（零延迟滚动同步）：
 
 ```html
-<div id="overlay-container" style="
+<div
+  id="overlay-container"
+  style="
   position: absolute;
   top: 0;
   left: 0;
@@ -244,7 +245,8 @@ receiver.destroy();
   pointer-events: none;
   overflow: visible;
   z-index: 9999;
-"></div>
+"
+></div>
 ```
 
 ### 与跨 iframe 模式共存
@@ -258,9 +260,7 @@ tracker.register(element, 'my-element');
 
 // 在 postMessage 派发之外，添加同页 receiver
 const localReceiver = new ElementReceiver(null);
-const unsubscribe = tracker.addMessageListener(
-  (msg) => localReceiver.handleTrackerMessage(msg),
-);
+const unsubscribe = tracker.addMessageListener((msg) => localReceiver.handleTrackerMessage(msg));
 // localReceiver 自动接收当前状态
 
 // 停止同页覆盖层：
@@ -281,21 +281,22 @@ new ElementTracker(options?: TrackerOptions)
 ```
 
 **配置项：**
+
 - `targetWindow?: Window` - postMessage 的目标窗口（默认：`window.parent`）
 - `targetOrigin?: string` - postMessage 的目标 origin（默认：`'*'`）
 - `onMessage?: (message: TrackerMessage) => void` - 直接消息回调；设置后跳过 postMessage
 
 #### 方法
 
-| 方法 | 描述 |
-|------|------|
-| `register(element, id, options?)` | 注册元素进行追踪 |
-| `unregister(id)` | 停止追踪元素 |
-| `updateMetadata(id, metadata)` | 更新元素的 metadata |
-| `forceUpdate()` | 手动触发更新 |
-| `addMessageListener(listener)` | 添加消息监听器；自动回放当前状态（返回取消订阅函数） |
-| `removeMessageListener(listener)` | 移除之前添加的消息监听器 |
-| `destroy()` | 清理所有资源 |
+| 方法                              | 描述                                                 |
+| --------------------------------- | ---------------------------------------------------- |
+| `register(element, id, options?)` | 注册元素进行追踪                                     |
+| `unregister(id)`                  | 停止追踪元素                                         |
+| `updateMetadata(id, metadata)`    | 更新元素的 metadata                                  |
+| `forceUpdate()`                   | 手动触发更新                                         |
+| `addMessageListener(listener)`    | 添加消息监听器；自动回放当前状态（返回取消订阅函数） |
+| `removeMessageListener(listener)` | 移除之前添加的消息监听器                             |
+| `destroy()`                       | 清理所有资源                                         |
 
 ### ElementReceiver
 
@@ -308,22 +309,23 @@ new ElementReceiver(iframe?: HTMLIFrameElement | null, options?: ReceiverOptions
 ```
 
 **配置项：**
+
 - `allowedOrigin?: string` - 允许的消息来源（默认：`'*'`）
 
 当 `iframe` 为 `null` 或省略时，receiver 进入同页模式：不监听 `window` 的 message 事件，需要通过 `handleTrackerMessage()` 传递消息。
 
 #### 方法
 
-| 方法 | 描述 |
-|------|------|
-| `on(event, callback)` | 监听事件（'init'、'update'、'remove'） |
-| `off(event, callback)` | 移除事件监听 |
-| `getElements()` | 获取所有追踪的元素 |
-| `getElement(id)` | 根据 ID 获取单个元素 |
-| `getIframe()` | 获取绑定的 iframe 元素（同页模式返回 `null`） |
-| `getIframeBounds()` | 获取 iframe 的边界矩形（同页模式返回 `null`） |
-| `handleTrackerMessage(message)` | 直接处理 TrackerMessage（用于同页模式） |
-| `destroy()` | 清理所有资源 |
+| 方法                            | 描述                                          |
+| ------------------------------- | --------------------------------------------- |
+| `on(event, callback)`           | 监听事件（'init'、'update'、'remove'）        |
+| `off(event, callback)`          | 移除事件监听                                  |
+| `getElements()`                 | 获取所有追踪的元素                            |
+| `getElement(id)`                | 根据 ID 获取单个元素                          |
+| `getIframe()`                   | 获取绑定的 iframe 元素（同页模式返回 `null`） |
+| `getIframeBounds()`             | 获取 iframe 的边界矩形（同页模式返回 `null`） |
+| `handleTrackerMessage(message)` | 直接处理 TrackerMessage（用于同页模式）       |
+| `destroy()`                     | 清理所有资源                                  |
 
 ### OverlayPositioner
 
@@ -336,22 +338,23 @@ new OverlayPositioner(options: OverlayPositionerOptions)
 ```
 
 **配置项：**
+
 - `iframe: HTMLIFrameElement` - iframe 元素
 - `container: HTMLElement` - 覆盖层容器元素
 
 #### 方法
 
-| 方法 | 描述 |
-|------|------|
-| `applyOverlayStyle(overlay, elementRect)` | 直接将计算好的样式应用到覆盖层元素 |
-| `getOverlayStyle(elementRect)` | 获取计算好的样式值（返回 `OverlayStyle \| null`） |
-| `getScaleContext()` | 获取所有缩放和偏移值，用于自定义计算 |
-| `transformCoordinates(x, y, context?)` | 将 iframe 坐标转换为 CSS left/top |
-| `transformDimensions(width, height, context?)` | 将尺寸转换为 CSS width/height |
-| `scaleBorderRadius(radius, scale)` | 缩放 border-radius 值 |
-| `getIframeScale()` | 获取 iframe 的 transform/zoom 合并缩放比例 |
-| `getIframeScaleSeparate()` | 分别获取 iframe 的 zoom 和 transform 缩放比例 |
-| `getAncestorScale()` | 获取祖先元素的累积缩放比例 |
+| 方法                                           | 描述                                              |
+| ---------------------------------------------- | ------------------------------------------------- |
+| `applyOverlayStyle(overlay, elementRect)`      | 直接将计算好的样式应用到覆盖层元素                |
+| `getOverlayStyle(elementRect)`                 | 获取计算好的样式值（返回 `OverlayStyle \| null`） |
+| `getScaleContext()`                            | 获取所有缩放和偏移值，用于自定义计算              |
+| `transformCoordinates(x, y, context?)`         | 将 iframe 坐标转换为 CSS left/top                 |
+| `transformDimensions(width, height, context?)` | 将尺寸转换为 CSS width/height                     |
+| `scaleBorderRadius(radius, scale)`             | 缩放 border-radius 值                             |
+| `getIframeScale()`                             | 获取 iframe 的 transform/zoom 合并缩放比例        |
+| `getIframeScaleSeparate()`                     | 分别获取 iframe 的 zoom 和 transform 缩放比例     |
+| `getAncestorScale()`                           | 获取祖先元素的累积缩放比例                        |
 
 ### ElementRect
 
@@ -461,6 +464,69 @@ npm run dev
 - Firefox 69+
 - Safari 14+
 - Edge 79+
+
+## 开发
+
+### 脚本命令
+
+```bash
+# 启动开发服务器
+npm run dev
+
+# 构建库文件（ESM + CJS + .d.ts）
+npm run build:lib
+
+# 代码检查
+npm run lint
+npm run lint:fix    # 自动修复
+
+# 代码格式化
+npm run format
+npm run format:check
+
+# 运行单元测试
+npm test
+
+# 运行 E2E 测试
+npm run test:e2e
+
+# 发布新版本（交互式）
+npm run release
+
+# 预览发布流程（不做实际变更）
+npm run release -- --dry-run
+```
+
+### 发布
+
+项目使用 [release-it](https://github.com/release-it/release-it) 进行自动化发布。执行 `npm run release` 后会：
+
+1. 运行 `build:lib` 和单元测试作为前置检查
+2. 根据 [Conventional Commits](https://www.conventionalcommits.org/) 推断下一个版本号
+3. 更新 `package.json` 中的版本号
+4. 生成/更新 `CHANGELOG.md`
+5. 创建 git commit 和 tag（`v*.*.*`）
+6. 发布到 npm
+
+### Git Hooks
+
+项目通过 [Husky](https://typicode.github.io/husky/) 配置了两个 Git hooks：
+
+- **pre-commit**：运行 [lint-staged](https://github.com/lint-staged/lint-staged) — 对暂存文件自动执行 ESLint 和 Prettier 修复
+- **commit-msg**：通过 [commitlint](https://commitlint.js.org/) 校验提交消息是否符合 [Conventional Commits](https://www.conventionalcommits.org/) 规范
+
+提交消息格式：`type(scope): description`
+
+- `feat(scope):` — 新功能
+- `fix(scope):` — Bug 修复
+- `docs(scope):` — 文档变更
+- `refactor(scope):` — 代码重构
+- `chore(scope):` — 维护任务
+
+### TODO
+
+- [ ] GitHub Actions CI（lint + 类型检查 + 单元测试 + E2E 测试）
+- [ ] 自动化发布工作流（tag 触发 npm publish）
 
 ## 许可证
 
