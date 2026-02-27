@@ -388,6 +388,7 @@ const elemTestButtons = {
   scale: document.getElementById('elem-test-scale')!,
   rotate: document.getElementById('elem-test-rotate')!,
   opacity: document.getElementById('elem-test-opacity')!,
+  pseudo: document.getElementById('elem-test-pseudo')!,
   reset: document.getElementById('elem-test-reset')!,
 };
 
@@ -402,6 +403,7 @@ const elemTestStates = {
   scale: false,
   rotate: false,
   opacity: false,
+  pseudo: false,
 };
 
 // Scale and Rotate are mutually exclusive (both set transform)
@@ -417,6 +419,7 @@ function updateElemTestButtonStates() {
   elemTestButtons.scale.classList.toggle('active', elemTestStates.scale);
   elemTestButtons.rotate.classList.toggle('active', elemTestStates.rotate);
   elemTestButtons.opacity.classList.toggle('active', elemTestStates.opacity);
+  elemTestButtons.pseudo.classList.toggle('active', elemTestStates.pseudo);
 }
 
 function sendElementStyleUpdate() {
@@ -482,6 +485,12 @@ elemTestButtons.opacity.addEventListener('click', () => {
   sendElementStyleUpdate();
 });
 
+elemTestButtons.pseudo.addEventListener('click', () => {
+  elemTestStates.pseudo = !elemTestStates.pseudo;
+  updateElemTestButtonStates();
+  sendElementStyleUpdate();
+});
+
 elemTestButtons.reset.addEventListener('click', () => {
   elemTestStates.hover = false;
   elemTestStates.margin = false;
@@ -492,6 +501,7 @@ elemTestButtons.reset.addEventListener('click', () => {
   elemTestStates.scale = false;
   elemTestStates.rotate = false;
   elemTestStates.opacity = false;
+  elemTestStates.pseudo = false;
   updateElemTestButtonStates();
   sendElementStyleUpdate();
 });

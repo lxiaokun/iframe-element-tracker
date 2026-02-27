@@ -451,6 +451,19 @@ test.describe('Element Style E2E', () => {
     await waitForElementStyleUpdate(page);
     await verifyOverlayAlignment(page, ['element-1']);
   });
+
+  test('overlay aligns after toggling element ::before/::after pseudo', async ({ page }) => {
+    await page.click('#elem-test-pseudo');
+    await waitForElementStyleUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1']);
+  });
+
+  test('overlay aligns after toggling element ::before/::after pseudo + Margin', async ({ page }) => {
+    await page.click('#elem-test-pseudo');
+    await page.click('#elem-test-margin');
+    await waitForElementStyleUpdate(page);
+    await verifyOverlayAlignment(page, ['element-1']);
+  });
 });
 
 // ==================== Inner Overlay E2E ====================

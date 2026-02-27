@@ -46,6 +46,28 @@
       border-radius: 8px;
     }
 
+    #element-1.has-pseudo {
+      flex-direction: column;
+      height: auto;
+      width: auto;
+    }
+
+    #element-1.has-pseudo::before {
+      content: '::before';
+      display: block;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 12px 40px;
+      font-size: 12px;
+    }
+
+    #element-1.has-pseudo::after {
+      content: '::after';
+      display: block;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 12px 40px;
+      font-size: 12px;
+    }
+
     #element-2 {
       background: #3498db;
       width: 200px;

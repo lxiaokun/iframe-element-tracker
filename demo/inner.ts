@@ -254,6 +254,8 @@ function setElementStyles(el: HTMLElement, styles: Record<string, boolean>) {
   }
 
   el.style.opacity = styles.opacity ? '0.3' : '';
+
+  el.classList.toggle('has-pseudo', !!styles.pseudo);
 }
 
 /**
@@ -268,6 +270,7 @@ function clearElementStyles(el: HTMLElement) {
   el.style.transform = '';
   el.style.transformOrigin = '';
   el.style.opacity = '';
+  el.classList.remove('has-pseudo');
 }
 
 // ==================== Hover mode state ====================
