@@ -5,7 +5,7 @@ import type { ElementRect, ElementStyles, ScaleContext } from '../../src/shared'
  * Pass partial overrides to customize specific fields.
  */
 export function createElementRect(
-  overrides: Partial<Omit<ElementRect, 'styles'>> & { styles?: Partial<ElementStyles> } = {}
+  overrides: Partial<Omit<ElementRect, 'styles'>> & { styles?: Partial<ElementStyles> } = {},
 ): ElementRect {
   const defaultStyles: ElementStyles = {
     boxSizing: 'border-box',
@@ -70,9 +70,7 @@ export function createElementRect(
  * Create a ScaleContext with identity (no-op) defaults.
  * All scales are 1, all offsets are 0.
  */
-export function createScaleContext(
-  overrides: Partial<ScaleContext> = {}
-): ScaleContext {
+export function createScaleContext(overrides: Partial<ScaleContext> = {}): ScaleContext {
   return {
     iframeScale: { scaleX: 1, scaleY: 1 },
     iframeZoom: { scaleX: 1, scaleY: 1 },

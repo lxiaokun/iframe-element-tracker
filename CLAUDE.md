@@ -101,6 +101,7 @@ The dev server runs at http://localhost:3000, demo page at http://localhost:3000
 ### Transform Handling
 
 For elements with CSS transforms:
+
 - `getBoundingClientRect()` returns the axis-aligned bounding box (AABB) of the transformed element
 - SDK uses `offsetWidth/offsetHeight` for original dimensions
 - Position is calculated from bounding box center
@@ -135,6 +136,7 @@ After completing a feature, always follow these steps in order:
 ## Testing Changes
 
 After making changes:
+
 1. Run `npx tsc --noEmit` to check for type errors
 2. Run `npm test` to execute unit tests
 3. Open http://localhost:3000/demo/host.html in browser
@@ -147,6 +149,7 @@ After making changes:
 ## Debugging Guidelines
 
 When using Chrome DevTools MCP for debugging:
+
 - **Do NOT use screenshots** - rely on code analysis and DevTools inspection instead
 - Use `take_snapshot` to get the DOM structure (a11y tree)
 - Use `evaluate_script` to execute JavaScript for checking element properties, computed styles, coordinates, etc.

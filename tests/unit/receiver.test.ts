@@ -10,7 +10,7 @@ import type { TrackerMessage, ElementRect } from '../../src/shared';
 function dispatchMessage(
   data: unknown,
   source: Window | null = null,
-  origin: string = 'http://localhost'
+  origin: string = 'http://localhost',
 ): void {
   const event = new MessageEvent('message', {
     data,
@@ -25,7 +25,7 @@ function dispatchMessage(
  */
 function createTrackerMessage(
   action: TrackerMessage['action'],
-  elements: ElementRect[]
+  elements: ElementRect[],
 ): TrackerMessage {
   return {
     type: MESSAGE_TYPE,
@@ -82,11 +82,15 @@ describe('ElementReceiver', () => {
       receiver.on('update', updateCallback);
 
       // Init first
-      const initElements = [createElementRect({ id: 'el-1', bounds: { x: 0, y: 0, width: 100, height: 50 } })];
+      const initElements = [
+        createElementRect({ id: 'el-1', bounds: { x: 0, y: 0, width: 100, height: 50 } }),
+      ];
       dispatchMessage(createTrackerMessage('init', initElements), mockContentWindow);
 
       // Then update
-      const updatedElements = [createElementRect({ id: 'el-1', bounds: { x: 50, y: 50, width: 100, height: 50 } })];
+      const updatedElements = [
+        createElementRect({ id: 'el-1', bounds: { x: 50, y: 50, width: 100, height: 50 } }),
+      ];
       dispatchMessage(createTrackerMessage('update', updatedElements), mockContentWindow);
 
       expect(updateCallback).toHaveBeenCalledOnce();
@@ -105,7 +109,7 @@ describe('ElementReceiver', () => {
       // Then remove
       dispatchMessage(
         createTrackerMessage('remove', [{ id: 'el-1' } as ElementRect]),
-        mockContentWindow
+        mockContentWindow,
       );
 
       expect(removeCallback).toHaveBeenCalledOnce();
@@ -129,7 +133,7 @@ describe('ElementReceiver', () => {
 
       dispatchMessage(
         { type: 'WRONG_TYPE', action: 'init', elements: [createElementRect()] },
-        mockContentWindow
+        mockContentWindow,
       );
 
       expect(callback).not.toHaveBeenCalled();
@@ -169,10 +173,7 @@ describe('ElementReceiver', () => {
 
   describe('state management', () => {
     it('getElements returns a copy of all elements', () => {
-      const elements = [
-        createElementRect({ id: 'el-1' }),
-        createElementRect({ id: 'el-2' }),
-      ];
+      const elements = [createElementRect({ id: 'el-1' }), createElementRect({ id: 'el-2' })];
       dispatchMessage(createTrackerMessage('init', elements), mockContentWindow);
 
       const result = receiver.getElements();
@@ -217,10 +218,7 @@ describe('ElementReceiver', () => {
       receiver.on('update', callback);
       receiver.off('update', callback);
 
-      dispatchMessage(
-        createTrackerMessage('update', [createElementRect()]),
-        mockContentWindow
-      );
+      dispatchMessage(createTrackerMessage('update', [createElementRect()]), mockContentWindow);
 
       expect(callback).not.toHaveBeenCalled();
     });
@@ -233,10 +231,7 @@ describe('ElementReceiver', () => {
       receiver.on('init', callback1);
       receiver.on('init', callback2);
 
-      dispatchMessage(
-        createTrackerMessage('init', [createElementRect()]),
-        mockContentWindow
-      );
+      dispatchMessage(createTrackerMessage('init', [createElementRect()]), mockContentWindow);
 
       expect(order).toEqual([1, 2]);
     });
@@ -251,10 +246,7 @@ describe('ElementReceiver', () => {
       receiver.on('init', callback1);
       receiver.on('init', callback2);
 
-      dispatchMessage(
-        createTrackerMessage('init', [createElementRect()]),
-        mockContentWindow
-      );
+      dispatchMessage(createTrackerMessage('init', [createElementRect()]), mockContentWindow);
 
       expect(callback1).toHaveBeenCalled();
       expect(callback2).toHaveBeenCalled();
@@ -273,10 +265,7 @@ describe('ElementReceiver', () => {
 
       receiver.destroy();
 
-      dispatchMessage(
-        createTrackerMessage('init', [createElementRect()]),
-        mockContentWindow
-      );
+      dispatchMessage(createTrackerMessage('init', [createElementRect()]), mockContentWindow);
 
       expect(callback).not.toHaveBeenCalled();
     });
@@ -284,7 +273,7 @@ describe('ElementReceiver', () => {
     it('clears elements and listeners on destroy', () => {
       dispatchMessage(
         createTrackerMessage('init', [createElementRect({ id: 'el-1' })]),
-        mockContentWindow
+        mockContentWindow,
       );
       expect(receiver.getElements().size).toBe(1);
 
@@ -368,11 +357,15 @@ describe('ElementReceiver (same-page mode)', () => {
 
       // Init first
       receiver.handleTrackerMessage(
-        createTrackerMessage('init', [createElementRect({ id: 'el-1', bounds: { x: 0, y: 0, width: 100, height: 50 } })])
+        createTrackerMessage('init', [
+          createElementRect({ id: 'el-1', bounds: { x: 0, y: 0, width: 100, height: 50 } }),
+        ]),
       );
 
       // Then update
-      const updatedElements = [createElementRect({ id: 'el-1', bounds: { x: 50, y: 50, width: 100, height: 50 } })];
+      const updatedElements = [
+        createElementRect({ id: 'el-1', bounds: { x: 50, y: 50, width: 100, height: 50 } }),
+      ];
       receiver.handleTrackerMessage(createTrackerMessage('update', updatedElements));
 
       expect(updateCallback).toHaveBeenCalledOnce();
@@ -384,12 +377,12 @@ describe('ElementReceiver (same-page mode)', () => {
       receiver.on('remove', removeCallback);
 
       receiver.handleTrackerMessage(
-        createTrackerMessage('init', [createElementRect({ id: 'el-1' })])
+        createTrackerMessage('init', [createElementRect({ id: 'el-1' })]),
       );
       expect(receiver.getElement('el-1')).toBeDefined();
 
       receiver.handleTrackerMessage(
-        createTrackerMessage('remove', [{ id: 'el-1' } as ElementRect])
+        createTrackerMessage('remove', [{ id: 'el-1' } as ElementRect]),
       );
 
       expect(removeCallback).toHaveBeenCalledOnce();
@@ -415,9 +408,7 @@ describe('ElementReceiver (same-page mode)', () => {
 
       receiver.destroy();
 
-      receiver.handleTrackerMessage(
-        createTrackerMessage('init', [createElementRect()])
-      );
+      receiver.handleTrackerMessage(createTrackerMessage('init', [createElementRect()]));
 
       expect(callback).not.toHaveBeenCalled();
     });

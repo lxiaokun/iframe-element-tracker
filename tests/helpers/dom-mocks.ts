@@ -78,7 +78,7 @@ export function installObserverMocks(): void {
  * Create a mock iframe element with a mock contentWindow.
  */
 export function createMockIframe(
-  computedStyle: Partial<CSSStyleDeclaration> = {}
+  computedStyle: Partial<CSSStyleDeclaration> = {},
 ): HTMLIFrameElement {
   const iframe = document.createElement('iframe');
   document.body.appendChild(iframe);
@@ -106,7 +106,7 @@ export function createMockIframe(
  * Create a mock CSSStyleDeclaration with defaults.
  */
 export function createMockComputedStyle(
-  overrides: Partial<CSSStyleDeclaration> = {}
+  overrides: Partial<CSSStyleDeclaration> = {},
 ): CSSStyleDeclaration {
   const defaults: Record<string, string> = {
     transform: 'none',

@@ -80,7 +80,7 @@ export class ElementTracker {
       },
       {
         threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
-      }
+      },
     );
 
     // Scroll event handler - sync update for best responsiveness
@@ -494,10 +494,7 @@ export class ElementTracker {
   /**
    * Parse spacing properties
    */
-  private parseSpacing(
-    style: CSSStyleDeclaration,
-    property: 'padding' | 'margin'
-  ): Spacing {
+  private parseSpacing(style: CSSStyleDeclaration, property: 'padding' | 'margin'): Spacing {
     return {
       top: parseFloat(style.getPropertyValue(`${property}-top`)) || 0,
       right: parseFloat(style.getPropertyValue(`${property}-right`)) || 0,

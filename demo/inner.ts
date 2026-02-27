@@ -46,7 +46,7 @@ function createLocalOverlay(elementRect: ElementRect) {
  * Update an overlay element
  */
 function updateLocalOverlay(elementRect: ElementRect) {
-  let overlay = overlayElements.get(elementRect.id);
+  const overlay = overlayElements.get(elementRect.id);
   if (!overlay) {
     createLocalOverlay(elementRect);
     return;
@@ -136,7 +136,9 @@ function applyLocalOverlayMode(overlay: HTMLElement, elementRect: ElementRect, l
       link.textContent = 'Details';
       link.onclick = (e) => {
         e.preventDefault();
-        alert(`Details for: ${elementRect.id}\n\nBounds: ${JSON.stringify(elementRect.bounds, null, 2)}`);
+        alert(
+          `Details for: ${elementRect.id}\n\nBounds: ${JSON.stringify(elementRect.bounds, null, 2)}`,
+        );
       };
 
       toolbar.appendChild(editBtn);
@@ -190,8 +192,8 @@ function startLocalTracking() {
   });
 
   // Subscribe to tracker — auto-replays current state as 'init'
-  unsubscribeListener = tracker.addMessageListener(
-    (msg) => localReceiver!.handleTrackerMessage(msg),
+  unsubscribeListener = tracker.addMessageListener((msg) =>
+    localReceiver!.handleTrackerMessage(msg),
   );
 }
 

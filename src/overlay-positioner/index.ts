@@ -61,10 +61,7 @@ export class OverlayPositioner {
     const dimensions = this.transformDimensions(bounds.width, bounds.height, context);
 
     // Scale border-radius
-    const borderRadius = this.scaleBorderRadius(
-      styles.border.radius,
-      context.iframeScale.scaleX
-    );
+    const borderRadius = this.scaleBorderRadius(styles.border.radius, context.iframeScale.scaleX);
 
     return {
       left: position.left,
@@ -76,7 +73,7 @@ export class OverlayPositioner {
       transformOrigin: this.scaleTransformOrigin(
         styles.transformOrigin,
         context.iframeScale.scaleX,
-        context.iframeScale.scaleY
+        context.iframeScale.scaleY,
       ),
     };
   }
@@ -123,7 +120,11 @@ export class OverlayPositioner {
    * Useful when you need to perform custom calculations or batch operations.
    */
   getScaleContext(): ScaleContext {
-    const { zoom: iframeZoom, transform: iframeTransform, translate: iframeTranslate } = this.getIframeScaleSeparate();
+    const {
+      zoom: iframeZoom,
+      transform: iframeTransform,
+      translate: iframeTranslate,
+    } = this.getIframeScaleSeparate();
     const iframeScale = {
       scaleX: iframeZoom.scaleX * iframeTransform.scaleX,
       scaleY: iframeZoom.scaleY * iframeTransform.scaleY,
@@ -264,12 +265,8 @@ export class OverlayPositioner {
   getIframeBorderPadding(): Offset2D {
     const style = window.getComputedStyle(this.iframe);
     return {
-      left:
-        (parseFloat(style.borderLeftWidth) || 0) +
-        (parseFloat(style.paddingLeft) || 0),
-      top:
-        (parseFloat(style.borderTopWidth) || 0) +
-        (parseFloat(style.paddingTop) || 0),
+      left: (parseFloat(style.borderLeftWidth) || 0) + (parseFloat(style.paddingLeft) || 0),
+      top: (parseFloat(style.borderTopWidth) || 0) + (parseFloat(style.paddingTop) || 0),
     };
   }
 
@@ -292,7 +289,7 @@ export class OverlayPositioner {
    */
   scaleBorderRadius(
     borderRadius: ElementRect['styles']['border']['radius'],
-    scale: number
+    scale: number,
   ): string {
     const scaleValue = (value: string): string => {
       // Preserve percentage values as-is (they are relative to the element's own size)
@@ -314,11 +311,7 @@ export class OverlayPositioner {
    * @param scaleX - Horizontal scale factor (typically iframeScale.scaleX)
    * @param scaleY - Vertical scale factor (typically iframeScale.scaleY)
    */
-  scaleTransformOrigin(
-    transformOrigin: string,
-    scaleX: number,
-    scaleY: number
-  ): string {
+  scaleTransformOrigin(transformOrigin: string, scaleX: number, scaleY: number): string {
     const parts = transformOrigin.split(' ');
     const scaleValue = (value: string, scale: number): string => {
       if (value.endsWith('%')) {
@@ -347,7 +340,7 @@ export class OverlayPositioner {
   transformCoordinates(
     iframeX: number,
     iframeY: number,
-    context?: ScaleContext
+    context?: ScaleContext,
   ): { left: number; top: number } {
     const ctx = context ?? this.getScaleContext();
 
@@ -417,7 +410,7 @@ export class OverlayPositioner {
   transformDimensions(
     width: number,
     height: number,
-    context?: ScaleContext
+    context?: ScaleContext,
   ): { width: number; height: number } {
     const ctx = context ?? this.getScaleContext();
 

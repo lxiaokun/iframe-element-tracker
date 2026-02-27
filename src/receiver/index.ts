@@ -1,9 +1,4 @@
-import {
-  ElementRect,
-  TrackerMessage,
-  MessageAction,
-  MESSAGE_TYPE,
-} from '../shared';
+import { ElementRect, TrackerMessage, MessageAction, MESSAGE_TYPE } from '../shared';
 
 /**
  * Event callback type
