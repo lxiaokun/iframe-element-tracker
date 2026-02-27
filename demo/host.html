@@ -1,380 +1,395 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Host Page - iframe-element-tracker Demo</title>
-  <style>
-    * {
-      box-sizing: border-box;
-    }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Host Page - iframe-element-tracker Demo</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
 
-    body {
-      margin: 0;
-      padding: 20px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #1a1a2e;
-      color: #eee;
-      min-height: 100vh;
-    }
+      body {
+        margin: 0;
+        padding: 20px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: #1a1a2e;
+        color: #eee;
+        min-height: 100vh;
+      }
 
-    h1 {
-      font-size: 20px;
-      margin-bottom: 20px;
-      color: #fff;
-    }
+      h1 {
+        font-size: 20px;
+        margin-bottom: 20px;
+        color: #fff;
+      }
 
-    /* Two-column layout */
-    .main-layout {
-      display: flex;
-      gap: 20px;
-      align-items: flex-start;
-    }
+      /* Two-column layout */
+      .main-layout {
+        display: flex;
+        gap: 20px;
+        align-items: flex-start;
+      }
 
-    .sidebar {
-      width: 500px;
-      flex-shrink: 0;
-    }
+      .sidebar {
+        width: 500px;
+        flex-shrink: 0;
+      }
 
-    .content {
-      flex: 1;
-      min-width: 0;
-    }
+      .content {
+        flex: 1;
+        min-width: 0;
+      }
 
-    /* 控制面板 */
-    .control-panel {
-      background: #16213e;
-      padding: 12px 15px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
+      /* 控制面板 */
+      .control-panel {
+        background: #16213e;
+        padding: 12px 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
 
-    .control-panel label {
-      font-size: 14px;
-      color: #aaa;
-      margin-right: 10px;
-    }
+      .control-panel label {
+        font-size: 14px;
+        color: #aaa;
+        margin-right: 10px;
+      }
 
-    .panel-help {
-      width: 100%;
-      font-size: 12px;
-      color: #666;
-      margin: -4px 0 4px 0;
-    }
+      .panel-help {
+        width: 100%;
+        font-size: 12px;
+        color: #666;
+        margin: -4px 0 4px 0;
+      }
 
-    .control-panel button {
-      padding: 5px 10px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 12px;
-      transition: all 0.2s;
-    }
+      .control-panel button {
+        padding: 5px 10px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.2s;
+      }
 
-    .control-panel button.active {
-      background: #0f3460;
-      color: #fff;
-      box-shadow: 0 0 10px rgba(15, 52, 96, 0.5);
-    }
+      .control-panel button.active {
+        background: #0f3460;
+        color: #fff;
+        box-shadow: 0 0 10px rgba(15, 52, 96, 0.5);
+      }
 
-    .control-panel button:not(.active) {
-      background: #333;
-      color: #aaa;
-    }
+      .control-panel button:not(.active) {
+        background: #333;
+        color: #aaa;
+      }
 
-    .control-panel button:hover:not(.active) {
-      background: #444;
-      color: #fff;
-    }
+      .control-panel button:hover:not(.active) {
+        background: #444;
+        color: #fff;
+      }
 
-    /* Button group for mutually exclusive options */
-    .btn-group {
-      display: flex;
-      gap: 0;
-    }
+      /* Button group for mutually exclusive options */
+      .btn-group {
+        display: flex;
+        gap: 0;
+      }
 
-    .btn-group button {
-      border-radius: 0;
-      border-right: 1px solid rgba(255, 255, 255, 0.08);
-    }
+      .btn-group button {
+        border-radius: 0;
+        border-right: 1px solid rgba(255, 255, 255, 0.08);
+      }
 
-    .btn-group button:first-child {
-      border-radius: 6px 0 0 6px;
-    }
+      .btn-group button:first-child {
+        border-radius: 6px 0 0 6px;
+      }
 
-    .btn-group button:last-child {
-      border-radius: 0 6px 6px 0;
-      border-right: none;
-    }
+      .btn-group button:last-child {
+        border-radius: 0 6px 6px 0;
+        border-right: none;
+      }
 
-    /* Mode toggle button — visually distinct from style buttons */
-    .control-panel button.mode-toggle {
-      background: transparent;
-      border: 1px solid #555;
-      color: #aaa;
-    }
+      /* Mode toggle button — visually distinct from style buttons */
+      .control-panel button.mode-toggle {
+        background: transparent;
+        border: 1px solid #555;
+        color: #aaa;
+      }
 
-    .control-panel button.mode-toggle:hover:not(.active) {
-      background: transparent;
-      border-color: #888;
-      color: #ccc;
-    }
+      .control-panel button.mode-toggle:hover:not(.active) {
+        background: transparent;
+        border-color: #888;
+        color: #ccc;
+      }
 
-    .control-panel button.mode-toggle.active {
-      background: transparent;
-      border-color: #e2b714;
-      color: #e2b714;
-      box-shadow: 0 0 8px rgba(226, 183, 20, 0.3);
-    }
+      .control-panel button.mode-toggle.active {
+        background: transparent;
+        border-color: #e2b714;
+        color: #e2b714;
+        box-shadow: 0 0 8px rgba(226, 183, 20, 0.3);
+      }
 
-    /* Vertical divider between mode toggle and style buttons */
-    .toggle-divider {
-      width: 1px;
-      height: 24px;
-      background: #444;
-      margin: 0 4px;
-    }
+      /* Vertical divider between mode toggle and style buttons */
+      .toggle-divider {
+        width: 1px;
+        height: 24px;
+        background: #444;
+        margin: 0 4px;
+      }
 
-    /* iframe 容器 */
-    .iframe-wrapper {
-      position: relative;
-      height: 500px;
-      overflow: visible;
-    }
+      /* iframe 容器 */
+      .iframe-wrapper {
+        position: relative;
+        height: 500px;
+        overflow: visible;
+      }
 
-    .iframe-wrapper iframe {
-      width: 100%;
-      height: 100%;
-      border: 2px solid #0f3460;
-      border-radius: 8px;
-      background: #fff;
-    }
+      .iframe-wrapper iframe {
+        width: 100%;
+        height: 100%;
+        border: 2px solid #0f3460;
+        border-radius: 8px;
+        background: #fff;
+      }
 
-    /* Overlay 容器 - 比 iframe 大，允许标注超出边界 */
-    .overlay-container {
-      position: absolute;
-      top: -50px;
-      left: -50px;
-      width: calc(100% + 100px);
-      height: calc(100% + 100px);
-      pointer-events: none;
-      overflow: visible;
-    }
+      /* Overlay 容器 - 比 iframe 大，允许标注超出边界 */
+      .overlay-container {
+        position: absolute;
+        top: -50px;
+        left: -50px;
+        width: calc(100% + 100px);
+        height: calc(100% + 100px);
+        pointer-events: none;
+        overflow: visible;
+      }
 
-    /* 状态面板 */
-    .status-panel {
-      background: #16213e;
-      padding: 15px 20px;
-      border-radius: 8px;
-      margin-top: 20px;
-    }
+      /* 状态面板 */
+      .status-panel {
+        background: #16213e;
+        padding: 15px 20px;
+        border-radius: 8px;
+        margin-top: 20px;
+      }
 
-    .status-panel h2 {
-      font-size: 14px;
-      color: #aaa;
-      margin-bottom: 10px;
-    }
+      .status-panel h2 {
+        font-size: 14px;
+        color: #aaa;
+        margin-bottom: 10px;
+      }
 
-    .status-content {
-      font-size: 12px;
-      color: #888;
-      max-height: 200px;
-      overflow-y: auto;
-    }
+      .status-content {
+        font-size: 12px;
+        color: #888;
+        max-height: 200px;
+        overflow-y: auto;
+      }
 
-    .status-content .element-info {
-      padding: 8px;
-      background: #1a1a2e;
-      border-radius: 4px;
-      margin-bottom: 8px;
-    }
+      .status-content .element-info {
+        padding: 8px;
+        background: #1a1a2e;
+        border-radius: 4px;
+        margin-bottom: 8px;
+      }
 
-    .status-content .element-info.visible {
-      border-left: 3px solid #2ecc71;
-    }
+      .status-content .element-info.visible {
+        border-left: 3px solid #2ecc71;
+      }
 
-    .status-content .element-info.hidden {
-      border-left: 3px solid #e74c3c;
-    }
+      .status-content .element-info.hidden {
+        border-left: 3px solid #e74c3c;
+      }
 
-    /* Overlay 样式 */
+      /* Overlay 样式 */
 
-    /* 透传型 - 不响应鼠标事件 */
-    .overlay-passthrough {
-      position: absolute;
-      border: 2px dashed rgba(46, 204, 113, 0.8);
-      pointer-events: none;
-    }
+      /* 透传型 - 不响应鼠标事件 */
+      .overlay-passthrough {
+        position: absolute;
+        border: 2px dashed rgba(46, 204, 113, 0.8);
+        pointer-events: none;
+      }
 
-    /* 响应型 - 响应 hover */
-    .overlay-interactive {
-      position: absolute;
-      border: 2px solid rgba(52, 152, 219, 0.8);
-      pointer-events: auto;
-      cursor: pointer;
-      transition: border-color 0.15s ease-out, background 0.15s ease-out, box-shadow 0.15s ease-out;
-    }
+      /* 响应型 - 响应 hover */
+      .overlay-interactive {
+        position: absolute;
+        border: 2px solid rgba(52, 152, 219, 0.8);
+        pointer-events: auto;
+        cursor: pointer;
+        transition:
+          border-color 0.15s ease-out,
+          background 0.15s ease-out,
+          box-shadow 0.15s ease-out;
+      }
 
-    .overlay-interactive:hover {
-      border-color: rgba(52, 152, 219, 1);
-      background: rgba(52, 152, 219, 0.2);
-      box-shadow: 0 0 15px rgba(52, 152, 219, 0.5);
-    }
+      .overlay-interactive:hover {
+        border-color: rgba(52, 152, 219, 1);
+        background: rgba(52, 152, 219, 0.2);
+        box-shadow: 0 0 15px rgba(52, 152, 219, 0.5);
+      }
 
-    /* 标签型 - 带标签 */
-    .overlay-labeled {
-      position: absolute;
-      border: 2px solid rgba(155, 89, 182, 0.8);
-      pointer-events: none;
-    }
+      /* 标签型 - 带标签 */
+      .overlay-labeled {
+        position: absolute;
+        border: 2px solid rgba(155, 89, 182, 0.8);
+        pointer-events: none;
+      }
 
-    .overlay-label {
-      position: absolute;
-      top: -28px;
-      left: -2px;
-      background: rgba(155, 89, 182, 0.9);
-      color: white;
-      font-size: 11px;
-      padding: 4px 8px;
-      border-radius: 4px 4px 0 0;
-      white-space: nowrap;
-      pointer-events: auto;
-      cursor: default;
-    }
+      .overlay-label {
+        position: absolute;
+        top: -28px;
+        left: -2px;
+        background: rgba(155, 89, 182, 0.9);
+        color: white;
+        font-size: 11px;
+        padding: 4px 8px;
+        border-radius: 4px 4px 0 0;
+        white-space: nowrap;
+        pointer-events: auto;
+        cursor: default;
+      }
 
-    /* 富交互型 - 带工具栏 */
-    .overlay-rich {
-      position: absolute;
-      border: 2px solid rgba(241, 196, 15, 0.8);
-      pointer-events: none;
-    }
+      /* 富交互型 - 带工具栏 */
+      .overlay-rich {
+        position: absolute;
+        border: 2px solid rgba(241, 196, 15, 0.8);
+        pointer-events: none;
+      }
 
-    .overlay-toolbar {
-      position: absolute;
-      bottom: -36px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(44, 62, 80, 0.95);
-      border-radius: 6px;
-      padding: 6px;
-      display: flex;
-      gap: 4px;
-      pointer-events: auto;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    }
+      .overlay-toolbar {
+        position: absolute;
+        bottom: -36px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(44, 62, 80, 0.95);
+        border-radius: 6px;
+        padding: 6px;
+        display: flex;
+        gap: 4px;
+        pointer-events: auto;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
 
-    .overlay-toolbar button {
-      padding: 4px 10px;
-      border: none;
-      border-radius: 4px;
-      font-size: 11px;
-      cursor: pointer;
-      background: #34495e;
-      color: #fff;
-      transition: background 0.2s;
-    }
+      .overlay-toolbar button {
+        padding: 4px 10px;
+        border: none;
+        border-radius: 4px;
+        font-size: 11px;
+        cursor: pointer;
+        background: #34495e;
+        color: #fff;
+        transition: background 0.2s;
+      }
 
-    .overlay-toolbar button:hover {
-      background: #4a6785;
-    }
+      .overlay-toolbar button:hover {
+        background: #4a6785;
+      }
 
-    .overlay-toolbar a {
-      padding: 4px 10px;
-      border-radius: 4px;
-      font-size: 11px;
-      text-decoration: none;
-      background: #2980b9;
-      color: #fff;
-      transition: background 0.2s;
-    }
+      .overlay-toolbar a {
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 11px;
+        text-decoration: none;
+        background: #2980b9;
+        color: #fff;
+        transition: background 0.2s;
+      }
 
-    .overlay-toolbar a:hover {
-      background: #3498db;
-    }
-  </style>
-</head>
-<body>
-  <h1>iframe-element-tracker Demo</h1>
+      .overlay-toolbar a:hover {
+        background: #3498db;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>iframe-element-tracker Demo</h1>
 
-  <div class="main-layout">
-    <aside class="sidebar">
-      <div class="control-panel">
-        <label>Host Overlay</label>
-        <p class="panel-help">Overlay rendering mode for elements tracked across the iframe boundary, rendered in the host page.</p>
-        <button id="mode-off">Off</button>
-        <button id="mode-passthrough" class="active">Passthrough</button>
-        <button id="mode-interactive">Interactive</button>
-        <button id="mode-labeled">Labeled</button>
-        <button id="mode-rich">Rich</button>
-      </div>
-
-      <div class="control-panel">
-        <label>Inner Overlay</label>
-        <p class="panel-help">Overlay rendering mode for same-page tracking inside the iframe (uses addMessageListener).</p>
-        <button id="inner-mode-off" class="active">Off</button>
-        <button id="inner-mode-passthrough">Passthrough</button>
-        <button id="inner-mode-interactive">Interactive</button>
-        <button id="inner-mode-labeled">Labeled</button>
-        <button id="inner-mode-rich">Rich</button>
-      </div>
-
-      <div class="control-panel">
-        <label>Iframe Styles</label>
-        <p class="panel-help">Toggle CSS properties on the iframe container to test overlay alignment under transforms, zoom, and layout changes.</p>
-        <button id="test-margin">Margin</button>
-        <button id="test-padding">Padding</button>
-        <button id="test-border">Border</button>
-        <div class="btn-group">
-          <button id="test-transform">Scale Down</button>
-          <button id="test-scale-up">Scale Up</button>
-          <button id="test-translate">Translate</button>
-          <button id="test-origin-center">Origin Center</button>
+    <div class="main-layout">
+      <aside class="sidebar">
+        <div class="control-panel">
+          <label>Host Overlay</label>
+          <p class="panel-help">
+            Overlay rendering mode for elements tracked across the iframe boundary, rendered in the
+            host page.
+          </p>
+          <button id="mode-off">Off</button>
+          <button id="mode-passthrough" class="active">Passthrough</button>
+          <button id="mode-interactive">Interactive</button>
+          <button id="mode-labeled">Labeled</button>
+          <button id="mode-rich">Rich</button>
         </div>
-        <button id="test-zoom">Zoom</button>
-        <button id="test-wrapper-zoom">Wrapper Zoom</button>
-        <button id="test-reset">Reset All</button>
-      </div>
 
-      <div class="control-panel">
-        <label>Element Styles</label>
-        <p class="panel-help">Toggle CSS properties on Element 1 inside the iframe. "Hover" mode defers changes until mouse enters the element.</p>
-        <span class="toggle-divider"></span>
-        <button id="elem-test-hover" class="mode-toggle">Hover</button>
-        <span class="toggle-divider"></span>
-        <button id="elem-test-margin">Margin</button>
-        <button id="elem-test-padding">Padding</button>
-        <button id="elem-test-border">Border</button>
-        <button id="elem-test-border-radius">Border Radius</button>
-        <button id="elem-test-box-sizing">Box Sizing</button>
-        <div class="btn-group">
-          <button id="elem-test-scale">Scale</button>
-          <button id="elem-test-rotate">Rotate</button>
+        <div class="control-panel">
+          <label>Inner Overlay</label>
+          <p class="panel-help">
+            Overlay rendering mode for same-page tracking inside the iframe (uses
+            addMessageListener).
+          </p>
+          <button id="inner-mode-off" class="active">Off</button>
+          <button id="inner-mode-passthrough">Passthrough</button>
+          <button id="inner-mode-interactive">Interactive</button>
+          <button id="inner-mode-labeled">Labeled</button>
+          <button id="inner-mode-rich">Rich</button>
         </div>
-        <button id="elem-test-opacity">Opacity</button>
-        <button id="elem-test-pseudo">::before/after</button>
-        <button id="elem-test-reset">Reset All</button>
-      </div>
-    </aside>
 
-    <main class="content">
-      <div class="iframe-wrapper">
-        <iframe id="inner-frame" src="./inner.html"></iframe>
-        <div class="overlay-container" id="overlay-container"></div>
-      </div>
-
-      <div class="status-panel">
-        <h2>Tracked Elements Status</h2>
-        <div class="status-content" id="status-content">
-          <p>Waiting for iframe to load...</p>
+        <div class="control-panel">
+          <label>Iframe Styles</label>
+          <p class="panel-help">
+            Toggle CSS properties on the iframe container to test overlay alignment under
+            transforms, zoom, and layout changes.
+          </p>
+          <button id="test-margin">Margin</button>
+          <button id="test-padding">Padding</button>
+          <button id="test-border">Border</button>
+          <div class="btn-group">
+            <button id="test-transform">Scale Down</button>
+            <button id="test-scale-up">Scale Up</button>
+            <button id="test-translate">Translate</button>
+            <button id="test-origin-center">Origin Center</button>
+          </div>
+          <button id="test-zoom">Zoom</button>
+          <button id="test-wrapper-zoom">Wrapper Zoom</button>
+          <button id="test-reset">Reset All</button>
         </div>
-      </div>
-    </main>
-  </div>
 
-  <script type="module" src="./host.ts"></script>
-</body>
+        <div class="control-panel">
+          <label>Element Styles</label>
+          <p class="panel-help">
+            Toggle CSS properties on Element 1 inside the iframe. "Hover" mode defers changes until
+            mouse enters the element.
+          </p>
+          <span class="toggle-divider"></span>
+          <button id="elem-test-hover" class="mode-toggle">Hover</button>
+          <span class="toggle-divider"></span>
+          <button id="elem-test-margin">Margin</button>
+          <button id="elem-test-padding">Padding</button>
+          <button id="elem-test-border">Border</button>
+          <button id="elem-test-border-radius">Border Radius</button>
+          <button id="elem-test-box-sizing">Box Sizing</button>
+          <div class="btn-group">
+            <button id="elem-test-scale">Scale</button>
+            <button id="elem-test-rotate">Rotate</button>
+          </div>
+          <button id="elem-test-opacity">Opacity</button>
+          <button id="elem-test-pseudo">::before/after</button>
+          <button id="elem-test-reset">Reset All</button>
+        </div>
+      </aside>
+
+      <main class="content">
+        <div class="iframe-wrapper">
+          <iframe id="inner-frame" src="./inner.html"></iframe>
+          <div class="overlay-container" id="overlay-container"></div>
+        </div>
+
+        <div class="status-panel">
+          <h2>Tracked Elements Status</h2>
+          <div class="status-content" id="status-content">
+            <p>Waiting for iframe to load...</p>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script type="module" src="./host.ts"></script>
+  </body>
 </html>

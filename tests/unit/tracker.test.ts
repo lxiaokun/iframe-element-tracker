@@ -239,7 +239,7 @@ describe('ElementTracker', () => {
           action: 'init',
           elements: expect.any(Array),
         }),
-        '*'
+        '*',
       );
     });
 
@@ -254,7 +254,7 @@ describe('ElementTracker', () => {
 
       expect(mockTargetWindow.postMessage).toHaveBeenCalledWith(
         expect.any(Object),
-        'https://example.com'
+        'https://example.com',
       );
     });
 
@@ -268,7 +268,7 @@ describe('ElementTracker', () => {
 
       expect(errorSpy).toHaveBeenCalledWith(
         'Failed to send message to parent window:',
-        expect.any(Error)
+        expect.any(Error),
       );
       errorSpy.mockRestore();
     });
@@ -413,10 +413,7 @@ describe('ElementTracker', () => {
 
       throwingTracker.register(testElement, 'test-el');
 
-      expect(errorSpy).toHaveBeenCalledWith(
-        'Error in onMessage callback:',
-        expect.any(Error)
-      );
+      expect(errorSpy).toHaveBeenCalledWith('Error in onMessage callback:', expect.any(Error));
 
       throwingTracker.destroy();
       errorSpy.mockRestore();
@@ -581,10 +578,7 @@ describe('ElementTracker', () => {
       expect(listener2).toHaveBeenCalledOnce();
 
       // Error is logged
-      expect(errorSpy).toHaveBeenCalledWith(
-        'Error in message listener:',
-        expect.any(Error)
-      );
+      expect(errorSpy).toHaveBeenCalledWith('Error in message listener:', expect.any(Error));
 
       errorSpy.mockRestore();
     });

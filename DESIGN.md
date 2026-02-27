@@ -73,22 +73,23 @@
 ```typescript
 interface ElementRect {
   // ===== 基础标识 =====
-  id: string;                    // 元素唯一标识
-  timestamp: number;             // 最后更新时间戳
+  id: string; // 元素唯一标识
+  timestamp: number; // 最后更新时间戳
 
   // ===== 位置和尺寸 =====
   bounds: {
-    x: number;                   // 相对于宿主页面的 x 坐标
-    y: number;                   // 相对于宿主页面的 y 坐标
-    width: number;               // 元素宽度
-    height: number;              // 元素高度
+    x: number; // 相对于宿主页面的 x 坐标
+    y: number; // 相对于宿主页面的 y 坐标
+    width: number; // 元素宽度
+    height: number; // 元素高度
   };
 
   // ===== 可见性 =====
   visibility: {
-    isVisible: boolean;          // 是否在视口中可见
-    isFullyVisible: boolean;     // 是否完全可见（未被裁剪）
-    visibleBounds: {             // 实际可见区域（被裁剪后）
+    isVisible: boolean; // 是否在视口中可见
+    isFullyVisible: boolean; // 是否完全可见（未被裁剪）
+    visibleBounds: {
+      // 实际可见区域（被裁剪后）
       x: number;
       y: number;
       width: number;
@@ -114,7 +115,7 @@ interface ElementRect {
     };
 
     // 变换
-    transform: string | null;    // 计算后的 transform matrix
+    transform: string | null; // 计算后的 transform matrix
     transformOrigin: string;
 
     // 裁剪与溢出
@@ -124,7 +125,7 @@ interface ElementRect {
     // 显示与层叠
     display: string;
     opacity: number;
-    zIndex: string;              // 'auto' 或数字字符串
+    zIndex: string; // 'auto' 或数字字符串
     pointerEvents: string;
     position: string;
 
@@ -177,9 +178,9 @@ class ElementTracker {
   register(
     element: HTMLElement | string,
     options?: {
-      id?: string;              // 自定义 ID
-      metadata?: Record<string, any>;  // 自定义数据
-    }
+      id?: string; // 自定义 ID
+      metadata?: Record<string, any>; // 自定义数据
+    },
   ): string;
 
   /**
@@ -327,20 +328,20 @@ ElementReceiver 提供三种事件：
   left: 0;
   width: 100%;
   height: 100%;
-  pointer-events: none;  /* 容器本身不响应事件 */
-  overflow: visible;     /* 允许子元素超出 */
+  pointer-events: none; /* 容器本身不响应事件 */
+  overflow: visible; /* 允许子元素超出 */
 }
 
 .overlay-label {
   position: absolute;
-  top: -28px;           /* 负值让标签超出上边界 */
+  top: -28px; /* 负值让标签超出上边界 */
   left: -2px;
-  pointer-events: auto;  /* 标签本身可响应事件 */
+  pointer-events: auto; /* 标签本身可响应事件 */
 }
 
 .overlay-toolbar {
   position: absolute;
-  bottom: -36px;        /* 负值让工具栏超出下边界 */
+  bottom: -36px; /* 负值让工具栏超出下边界 */
   pointer-events: auto;
 }
 ```
@@ -357,9 +358,7 @@ type TrackerMessage =
   | { type: 'REMOVE'; elements: { id: string }[] };
 
 // 可扩展：ElementReceiver → ElementTracker (未来可能需要)
-type ReceiverMessage =
-  | { type: 'PING' }
-  | { type: 'REQUEST_UPDATE' };
+type ReceiverMessage = { type: 'PING' } | { type: 'REQUEST_UPDATE' };
 ```
 
 ### 安全性考虑
@@ -418,11 +417,11 @@ const tracker = new ElementTracker();
 
 // 注册元素
 tracker.register('#button1', {
-  metadata: { label: 'Primary Button' }
+  metadata: { label: 'Primary Button' },
 });
 
 tracker.register('.card', {
-  metadata: { label: 'Card Component' }
+  metadata: { label: 'Card Component' },
 });
 ```
 
@@ -436,17 +435,17 @@ const receiver = new ElementReceiver(iframe);
 
 // 监听初始化
 receiver.on('init', (elements) => {
-  elements.forEach(el => createOverlay(el));
+  elements.forEach((el) => createOverlay(el));
 });
 
 // 监听更新
 receiver.on('update', (elements) => {
-  elements.forEach(el => updateOverlay(el));
+  elements.forEach((el) => updateOverlay(el));
 });
 
 // 监听移除
 receiver.on('remove', (elements) => {
-  elements.forEach(el => removeOverlay(el.id));
+  elements.forEach((el) => removeOverlay(el.id));
 });
 
 function createOverlay(elementRect: ElementRect) {

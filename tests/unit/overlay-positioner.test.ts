@@ -1,9 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OverlayPositioner } from '../../src/overlay-positioner';
 import { createElementRect, createScaleContext } from '../helpers/fixtures';
-import {
-  createMockComputedStyle,
-} from '../helpers/dom-mocks';
+import { createMockComputedStyle } from '../helpers/dom-mocks';
 
 describe('OverlayPositioner', () => {
   let iframe: HTMLIFrameElement;
@@ -231,9 +229,7 @@ describe('OverlayPositioner', () => {
 
   describe('getOverlayStyle', () => {
     beforeEach(() => {
-      vi.spyOn(positioner, 'getScaleContext').mockReturnValue(
-        createScaleContext()
-      );
+      vi.spyOn(positioner, 'getScaleContext').mockReturnValue(createScaleContext());
     });
 
     it('returns null for invisible elements', () => {
@@ -335,7 +331,7 @@ describe('OverlayPositioner', () => {
   describe('getIframeScaleSeparate', () => {
     it('parses CSS zoom value', () => {
       vi.spyOn(window, 'getComputedStyle').mockReturnValue(
-        createMockComputedStyle({ zoom: '0.8' })
+        createMockComputedStyle({ zoom: '0.8' }),
       );
 
       const { zoom, transform } = positioner.getIframeScaleSeparate();
@@ -347,7 +343,7 @@ describe('OverlayPositioner', () => {
 
     it('parses matrix() transform', () => {
       vi.spyOn(window, 'getComputedStyle').mockReturnValue(
-        createMockComputedStyle({ transform: 'matrix(0.5, 0, 0, 0.5, 0, 0)' })
+        createMockComputedStyle({ transform: 'matrix(0.5, 0, 0, 0.5, 0, 0)' }),
       );
 
       const { zoom, transform } = positioner.getIframeScaleSeparate();
@@ -358,7 +354,7 @@ describe('OverlayPositioner', () => {
 
     it('returns identity when no transform or zoom', () => {
       vi.spyOn(window, 'getComputedStyle').mockReturnValue(
-        createMockComputedStyle({ transform: 'none', zoom: '1' })
+        createMockComputedStyle({ transform: 'none', zoom: '1' }),
       );
 
       const { zoom, transform } = positioner.getIframeScaleSeparate();
@@ -373,7 +369,7 @@ describe('OverlayPositioner', () => {
         createMockComputedStyle({
           zoom: '0.8',
           transform: 'matrix(0.5, 0, 0, 0.5, 0, 0)',
-        })
+        }),
       );
 
       const { zoom, transform } = positioner.getIframeScaleSeparate();
@@ -414,7 +410,7 @@ describe('OverlayPositioner', () => {
       document.body.appendChild(container);
 
       vi.spyOn(window, 'getComputedStyle').mockReturnValue(
-        createMockComputedStyle({ zoom: '1', transform: 'none' })
+        createMockComputedStyle({ zoom: '1', transform: 'none' }),
       );
 
       const scale = positioner.getAncestorScale();

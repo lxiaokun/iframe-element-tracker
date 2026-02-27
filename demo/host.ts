@@ -72,7 +72,7 @@ function createOverlay(elementRect: ElementRect) {
 function updateOverlay(elementRect: ElementRect) {
   if (currentMode === 'off') return;
 
-  let overlay = overlayElements.get(elementRect.id);
+  const overlay = overlayElements.get(elementRect.id);
 
   if (!overlay) {
     createOverlay(elementRect);
@@ -126,15 +126,16 @@ function applyOverlayMode(overlay: HTMLElement, elementRect: ElementRect, label?
       };
       break;
 
-    case 'labeled':
+    case 'labeled': {
       overlay.className = 'overlay-labeled';
       const labelEl = document.createElement('div');
       labelEl.className = 'overlay-label';
       labelEl.textContent = label || elementRect.id;
       overlay.appendChild(labelEl);
       break;
+    }
 
-    case 'rich':
+    case 'rich': {
       overlay.className = 'overlay-rich';
       const toolbar = document.createElement('div');
       toolbar.className = 'overlay-toolbar';
@@ -152,7 +153,9 @@ function applyOverlayMode(overlay: HTMLElement, elementRect: ElementRect, label?
       link.textContent = 'Details';
       link.onclick = (e) => {
         e.preventDefault();
-        alert(`Details for: ${elementRect.id}\n\nBounds: ${JSON.stringify(elementRect.bounds, null, 2)}`);
+        alert(
+          `Details for: ${elementRect.id}\n\nBounds: ${JSON.stringify(elementRect.bounds, null, 2)}`,
+        );
       };
 
       toolbar.appendChild(editBtn);
@@ -160,6 +163,7 @@ function applyOverlayMode(overlay: HTMLElement, elementRect: ElementRect, label?
       toolbar.appendChild(link);
       overlay.appendChild(toolbar);
       break;
+    }
   }
 }
 
@@ -423,11 +427,14 @@ function updateElemTestButtonStates() {
 }
 
 function sendElementStyleUpdate() {
-  iframe.contentWindow?.postMessage({
-    type: 'ELEMENT_STYLE_CONTROL',
-    action: 'applyStyles',
-    styles: elemTestStates,
-  }, '*');
+  iframe.contentWindow?.postMessage(
+    {
+      type: 'ELEMENT_STYLE_CONTROL',
+      action: 'applyStyles',
+      styles: elemTestStates,
+    },
+    '*',
+  );
 }
 
 elemTestButtons.hover.addEventListener('click', () => {
@@ -522,11 +529,14 @@ function setInnerMode(mode: InnerOverlayMode) {
   });
 
   // Send control message to iframe
-  iframe.contentWindow?.postMessage({
-    type: 'OVERLAY_CONTROL',
-    action: 'setMode',
-    mode,
-  }, '*');
+  iframe.contentWindow?.postMessage(
+    {
+      type: 'OVERLAY_CONTROL',
+      action: 'setMode',
+      mode,
+    },
+    '*',
+  );
 }
 
 Object.entries(innerModeButtons).forEach(([mode, btn]) => {
