@@ -1,6 +1,6 @@
 import { ElementReceiver } from '../src/receiver';
 import { OverlayPositioner } from '../src/overlay-positioner';
-import type { ElementRect } from '../src/shared';
+import type { ElementRect, Bounds, ContainerScroll } from '../src/shared';
 
 // Overlay rendering mode
 type OverlayMode = 'off' | 'passthrough' | 'interactive' | 'labeled' | 'rich';
@@ -11,6 +11,7 @@ let positioner: OverlayPositioner | null = null;
 
 // DOM element references
 const iframe = document.getElementById('inner-frame') as HTMLIFrameElement;
+const overlayClip = document.getElementById('overlay-clip')!;
 const overlayContainer = document.getElementById('overlay-container')!;
 const statusContent = document.getElementById('status-content')!;
 
@@ -26,14 +27,43 @@ const modeButtons = {
 // Store overlay DOM elements
 const overlayElements: Map<string, HTMLElement> = new Map();
 
+// Last known container scroll state for scroll-only detection
+let lastContainerScroll: ContainerScroll | undefined = undefined;
+
+/**
+ * Convert viewport-relative bounds to document-relative bounds
+ */
+function toDocumentBounds(bounds: Bounds, scroll: { scrollX: number; scrollY: number }): Bounds {
+  return {
+    x: bounds.x + scroll.scrollX,
+    y: bounds.y + scroll.scrollY,
+    width: bounds.width,
+    height: bounds.height,
+  };
+}
+
+/**
+ * Sync overlay container transform with iframe scroll position
+ */
+function syncScrollTransform(scroll: ContainerScroll) {
+  if (!positioner) return;
+  const ctx = positioner.getScaleContext();
+  const scaledScrollY = scroll.scrollY * ctx.iframeScale.scaleY;
+  const scaledScrollX = scroll.scrollX * ctx.iframeScale.scaleX;
+  const scaledHeight = scroll.scrollHeight * ctx.iframeScale.scaleY + 100; // +100 for clip layer padding
+
+  overlayContainer.style.height = `${scaledHeight}px`;
+  overlayContainer.style.transform = `translate(${-scaledScrollX}px, ${-scaledScrollY}px)`;
+}
+
 /**
  * Initialize ElementReceiver
  */
 function initReceiver() {
   receiver = new ElementReceiver(iframe);
 
-  // Create OverlayPositioner independently
-  positioner = new OverlayPositioner({ iframe, container: overlayContainer });
+  // Create OverlayPositioner — container is the clip layer (same offset as old overlay-container)
+  positioner = new OverlayPositioner({ iframe, container: overlayClip });
 
   receiver.on('init', (elements) => {
     console.log('Received init:', elements);
@@ -42,6 +72,33 @@ function initReceiver() {
   });
 
   receiver.on('update', (elements) => {
+    const containerScroll = receiver!.getContainerScroll();
+
+    if (containerScroll) {
+      // Always sync scroll transform
+      syncScrollTransform(containerScroll);
+
+      // Detect scroll-only changes — skip full overlay recalculation
+      const scrollChanged =
+        lastContainerScroll &&
+        (containerScroll.scrollX !== lastContainerScroll.scrollX ||
+          containerScroll.scrollY !== lastContainerScroll.scrollY);
+      lastContainerScroll = { ...containerScroll };
+
+      if (scrollChanged) {
+        // Scroll-only: just update visibility (show/hide), skip coordinate recalculation
+        elements.forEach((el) => {
+          const overlay = overlayElements.get(el.id);
+          if (overlay) {
+            overlay.style.display = el.visibility.isVisible ? 'block' : 'none';
+          }
+        });
+        updateStatus();
+        return;
+      }
+    }
+
+    // Non-scroll change (resize, style, init) — full overlay update
     elements.forEach((el) => updateOverlay(el));
     updateStatus();
   });
@@ -83,7 +140,7 @@ function updateOverlay(elementRect: ElementRect) {
 }
 
 /**
- * Update overlay style and position
+ * Update overlay style and position (uses document-relative coordinates)
  */
 function updateOverlayStyle(overlay: HTMLElement, elementRect: ElementRect) {
   const { visibility } = elementRect;
@@ -98,8 +155,18 @@ function updateOverlayStyle(overlay: HTMLElement, elementRect: ElementRect) {
   overlay.style.display = 'block';
 
   // Use OverlayPositioner to apply position and size
+  // Convert viewport-relative bounds to document-relative before positioning
   if (positioner) {
-    positioner.applyOverlayStyle(overlay, elementRect);
+    const containerScroll = receiver?.getContainerScroll();
+    if (containerScroll) {
+      const docRect = {
+        ...elementRect,
+        bounds: toDocumentBounds(elementRect.bounds, containerScroll),
+      };
+      positioner.applyOverlayStyle(overlay, docRect);
+    } else {
+      positioner.applyOverlayStyle(overlay, elementRect);
+    }
   }
 
   // Set class name and content based on mode

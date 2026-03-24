@@ -184,8 +184,10 @@ test.describe('Overlay E2E', () => {
   });
 
   test('overlays update position after iframe scroll', async ({ page }) => {
-    // Get initial position of element-1 overlay
-    const initialTop = await getOverlayTop(page, 'element-1');
+    // Get initial visual position of element-1 overlay (getBoundingClientRect)
+    const initialVisualTop = await page
+      .locator('#overlay-container [data-overlay-id="element-1"]')
+      .evaluate((el) => el.getBoundingClientRect().top);
 
     // Scroll inside the iframe using window.scrollTo
     const iframePage = page.frameLocator('#inner-frame');
@@ -196,11 +198,13 @@ test.describe('Overlay E2E', () => {
     // Wait for scroll event to fire and update to propagate
     await page.waitForTimeout(300);
 
-    // Overlay position should have changed
-    const newTop = await getOverlayTop(page, 'element-1');
+    // Overlay visual position should have changed (moved up by ~150px * scale)
+    const newVisualTop = await page
+      .locator('#overlay-container [data-overlay-id="element-1"]')
+      .evaluate((el) => el.getBoundingClientRect().top);
     expect(
-      Math.abs(newTop - initialTop),
-      `Expected overlay top to change after scroll. Initial: ${initialTop}, After: ${newTop}`,
+      Math.abs(newVisualTop - initialVisualTop),
+      `Expected overlay visual top to change after scroll. Initial: ${initialVisualTop}, After: ${newVisualTop}`,
     ).toBeGreaterThan(10);
   });
 });
@@ -226,15 +230,6 @@ async function waitForOverlayUpdate(page: Page): Promise<void> {
  */
 async function waitForElementStyleUpdate(page: Page): Promise<void> {
   await page.waitForTimeout(300);
-}
-
-/**
- * Get the top position of an overlay by element id.
- */
-async function getOverlayTop(page: Page, elementId: string): Promise<number> {
-  return page
-    .locator(`#overlay-container [data-overlay-id="${elementId}"]`)
-    .evaluate((el) => parseFloat((el as HTMLElement).style.top));
 }
 
 /**
