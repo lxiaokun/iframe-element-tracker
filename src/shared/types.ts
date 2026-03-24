@@ -121,6 +121,16 @@ export interface ElementRect {
 export type MessageAction = 'init' | 'update' | 'remove';
 
 /**
+ * Scroll container state (window or user-specified element)
+ */
+export interface ContainerScroll {
+  scrollX: number;
+  scrollY: number;
+  scrollWidth: number;
+  scrollHeight: number;
+}
+
+/**
  * Message structure from iframe to host page
  */
 export interface TrackerMessage {
@@ -130,6 +140,8 @@ export interface TrackerMessage {
   action: MessageAction;
   /** Element information list */
   elements: ElementRect[];
+  /** Scroll container state (window or user-specified scrollContainer) */
+  containerScroll?: ContainerScroll;
 }
 
 // ==================== Overlay Positioner Types ====================
