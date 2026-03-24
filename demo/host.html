@@ -154,13 +154,24 @@
         background: #fff;
       }
 
-      /* Overlay 容器 - 比 iframe 大，允许标注超出边界 */
-      .overlay-container {
+      /* Overlay clip layer — clips to iframe viewport + 50px margin for labels/toolbars */
+      .overlay-clip {
         position: absolute;
         top: -50px;
         left: -50px;
         width: calc(100% + 100px);
         height: calc(100% + 100px);
+        overflow: hidden;
+        pointer-events: none;
+      }
+
+      /* Overlay scroll-sync layer — height set by JS, translated on scroll */
+      #overlay-container {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        min-height: 100%;
         pointer-events: none;
         overflow: visible;
       }
@@ -378,7 +389,9 @@
       <main class="content">
         <div class="iframe-wrapper">
           <iframe id="inner-frame" src="./inner.html"></iframe>
-          <div class="overlay-container" id="overlay-container"></div>
+          <div class="overlay-clip" id="overlay-clip">
+            <div id="overlay-container"></div>
+          </div>
         </div>
 
         <div class="status-panel">
