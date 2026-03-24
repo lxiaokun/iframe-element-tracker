@@ -16,6 +16,7 @@ export type {
   ElementRect,
   MessageAction,
   TrackerMessage,
+  ContainerScroll,
   Scale2D,
   Offset2D,
   OverlayStyle,

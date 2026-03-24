@@ -1,4 +1,10 @@
-import { ElementRect, TrackerMessage, MessageAction, MESSAGE_TYPE } from '../shared';
+import {
+  ElementRect,
+  TrackerMessage,
+  MessageAction,
+  ContainerScroll,
+  MESSAGE_TYPE,
+} from '../shared';
 
 /**
  * Event callback type
@@ -24,6 +30,7 @@ export class ElementReceiver {
   private listeners: Map<MessageAction, Set<EventCallback>> = new Map();
   private messageHandler: ((event: MessageEvent) => void) | null = null;
   private isDestroyed = false;
+  private containerScroll: ContainerScroll | undefined = undefined;
 
   constructor(iframe?: HTMLIFrameElement | null, options: ReceiverOptions = {}) {
     this.iframe = iframe ?? null;
@@ -92,6 +99,13 @@ export class ElementReceiver {
   }
 
   /**
+   * Get the latest scroll container state from the tracker
+   */
+  getContainerScroll(): ContainerScroll | undefined {
+    return this.containerScroll;
+  }
+
+  /**
    * Directly handle a TrackerMessage without postMessage validation.
    * Used for same-page tracking mode where tracker and receiver are in the same window.
    */
@@ -103,6 +117,8 @@ export class ElementReceiver {
     if (!message || message.type !== MESSAGE_TYPE) {
       return;
     }
+
+    this.containerScroll = message.containerScroll;
 
     switch (message.action) {
       case 'init':
@@ -158,6 +174,8 @@ export class ElementReceiver {
     }
 
     // Handle different actions
+    this.containerScroll = message.containerScroll;
+
     switch (message.action) {
       case 'init':
         this.handleInit(message.elements);

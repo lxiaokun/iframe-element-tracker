@@ -34,6 +34,12 @@ export interface TrackerOptions {
   throttleDelay?: number;
   /** Direct message callback, bypasses postMessage when provided */
   onMessage?: (message: TrackerMessage) => void;
+  /**
+   * Scroll container element. Defaults to window (document scrolling).
+   * When set, tracker reports this element's scroll state in containerScroll
+   * instead of window's, and binds scroll events to this element.
+   */
+  scrollContainer?: HTMLElement;
 }
 
 /**
@@ -62,11 +68,13 @@ export class ElementTracker {
   private messageListeners: Set<TrackerMessageListener> = new Set();
   private pendingUpdate: number | null = null;
   private isDestroyed = false;
+  private scrollContainer: HTMLElement | null;
 
   constructor(options: TrackerOptions = {}) {
     this.targetWindow = options.targetWindow ?? window.parent;
     this.targetOrigin = options.targetOrigin ?? '*';
     this.onMessage = options.onMessage ?? null;
+    this.scrollContainer = options.scrollContainer ?? null;
 
     // Create ResizeObserver to monitor element size changes
     this.resizeObserver = new ResizeObserver(() => {
@@ -93,8 +101,9 @@ export class ElementTracker {
       this.performUpdate();
     };
 
-    // Bindvents
-    window.addEventListener('scroll', this.scrollHandler, { passive: true, capture: true });
+    // Bind events
+    const scrollTarget: EventTarget = this.scrollContainer ?? window;
+    scrollTarget.addEventListener('scroll', this.scrollHandler, { passive: true, capture: true });
     window.addEventListener('resize', this.resizeHandler, { passive: true });
   }
 
@@ -217,7 +226,8 @@ export class ElementTracker {
       cancelAnimationFrame(this.pendingUpdate);
     }
 
-    window.removeEventListener('scroll', this.scrollHandler, { capture: true });
+    const scrollTarget: EventTarget = this.scrollContainer ?? window;
+    scrollTarget.removeEventListener('scroll', this.scrollHandler, { capture: true });
     window.removeEventListener('resize', this.resizeHandler);
 
     this.resizeObserver.disconnect();
@@ -519,6 +529,26 @@ export class ElementTracker {
   }
 
   /**
+   * Get scroll state from the scroll container (or window if none specified)
+   */
+  private getContainerScroll(): TrackerMessage['containerScroll'] {
+    if (this.scrollContainer) {
+      return {
+        scrollX: this.scrollContainer.scrollLeft,
+        scrollY: this.scrollContainer.scrollTop,
+        scrollWidth: this.scrollContainer.scrollWidth,
+        scrollHeight: this.scrollContainer.scrollHeight,
+      };
+    }
+    return {
+      scrollX: window.scrollX,
+      scrollY: window.scrollY,
+      scrollWidth: document.documentElement.scrollWidth,
+      scrollHeight: document.documentElement.scrollHeight,
+    };
+  }
+
+  /**
    * Send update message to host page
    */
   private sendUpdate(action: TrackerMessage['action'], elements: ElementRect[]): void {
@@ -526,6 +556,7 @@ export class ElementTracker {
       type: MESSAGE_TYPE,
       action,
       elements,
+      containerScroll: this.getContainerScroll(),
     };
 
     // Primary dispatch
