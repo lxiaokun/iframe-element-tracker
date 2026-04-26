@@ -169,7 +169,7 @@ receiver.on('update', (elements) => {
 ```typescript
 // 获取所有缩放和偏移值
 const context = positioner.getScaleContext();
-// 返回: { iframeScale, iframeZoom, iframeTransform, ancestorScale,
+// 返回: { iframeScale, iframeZoom, iframeTransform, iframeTranslate, ancestorScale,
 //         combinedScale, iframeMargin, iframeBorderPadding, containerOffset }
 
 // 手动转换坐标
@@ -285,6 +285,7 @@ new ElementTracker(options?: TrackerOptions)
 - `targetWindow?: Window` - postMessage 的目标窗口（默认：`window.parent`）
 - `targetOrigin?: string` - postMessage 的目标 origin（默认：`'*'`）
 - `onMessage?: (message: TrackerMessage) => void` - 直接消息回调；设置后跳过 postMessage
+- `scrollContainer?: HTMLElement` - 滚动容器元素；设置后上报该元素的滚动状态而非 window 的，并将滚动事件绑定到该元素
 
 #### 方法
 
@@ -324,6 +325,7 @@ new ElementReceiver(iframe?: HTMLIFrameElement | null, options?: ReceiverOptions
 | `getElement(id)`                | 根据 ID 获取单个元素                          |
 | `getIframe()`                   | 获取绑定的 iframe 元素（同页模式返回 `null`） |
 | `getIframeBounds()`             | 获取 iframe 的边界矩形（同页模式返回 `null`） |
+| `getContainerScroll()`          | 获取滚动容器的最新状态                        |
 | `handleTrackerMessage(message)` | 直接处理 TrackerMessage（用于同页模式）       |
 | `destroy()`                     | 清理所有资源                                  |
 
@@ -352,9 +354,14 @@ new OverlayPositioner(options: OverlayPositionerOptions)
 | `transformCoordinates(x, y, context?)`         | 将 iframe 坐标转换为 CSS left/top                 |
 | `transformDimensions(width, height, context?)` | 将尺寸转换为 CSS width/height                     |
 | `scaleBorderRadius(radius, scale)`             | 缩放 border-radius 值                             |
+| `scaleTransformOrigin(origin, scaleX, scaleY)` | 缩放 transform-origin 值                          |
 | `getIframeScale()`                             | 获取 iframe 的 transform/zoom 合并缩放比例        |
 | `getIframeScaleSeparate()`                     | 分别获取 iframe 的 zoom 和 transform 缩放比例     |
 | `getAncestorScale()`                           | 获取祖先元素的累积缩放比例                        |
+| `setContainer(container)`                      | 动态更新覆盖层容器引用                            |
+| `setIframe(iframe)`                            | 动态更新 iframe 引用                              |
+| `getIframe()`                                  | 获取当前 iframe 元素                              |
+| `getContainer()`                               | 获取当前覆盖层容器元素                            |
 
 ### ElementRect
 
