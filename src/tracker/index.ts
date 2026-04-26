@@ -30,8 +30,6 @@ export interface TrackerOptions {
   targetWindow?: Window;
   /** Target origin, defaults to '*' */
   targetOrigin?: string;
-  /** Throttle delay in milliseconds, defaults to 16ms */
-  throttleDelay?: number;
   /** Direct message callback, bypasses postMessage when provided */
   onMessage?: (message: TrackerMessage) => void;
   /**

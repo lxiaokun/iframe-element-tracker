@@ -21,8 +21,9 @@ This SDK requires control over both the host page and iframe page code (or abili
 ```
 iframe-element-tracker/
 ├── src/
+│   ├── index.ts             # Public entry - re-exports all modules
 │   ├── shared/              # Shared types and constants
-│   │   ├── types.ts         # ElementRect, ElementAttributes, etc.
+│   │   ├── types.ts         # ElementRect, ElementAttributes, ScaleContext, etc.
 │   │   ├── constants.ts     # MESSAGE_TYPE, throttle delay
 │   │   └── index.ts         # Re-exports
 │   ├── tracker/             # ElementTracker (iframe side)
@@ -45,7 +46,9 @@ iframe-element-tracker/
 │   ├── host.html            # Host page with overlay container
 │   ├── host.ts              # Overlay rendering logic
 │   ├── inner.html           # iframe content with tracked elements
-│   └── inner.ts             # Element registration
+│   ├── inner.ts             # Element registration
+│   ├── benchmark.html       # Performance benchmark page
+│   └── benchmark.ts         # Benchmark logic
 ├── DESIGN.md                # Detailed design documentation (Chinese)
 ├── README.md                # English documentation
 └── README.zh-CN.md          # Chinese documentation

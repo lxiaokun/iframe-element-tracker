@@ -169,7 +169,7 @@ For custom calculations or optimization, you can access the low-level methods:
 ```typescript
 // Get all scale and offset values
 const context = positioner.getScaleContext();
-// Returns: { iframeScale, iframeZoom, iframeTransform, ancestorScale,
+// Returns: { iframeScale, iframeZoom, iframeTransform, iframeTranslate, ancestorScale,
 //            combinedScale, iframeMargin, iframeBorderPadding, containerOffset }
 
 // Transform coordinates manually
@@ -285,6 +285,7 @@ new ElementTracker(options?: TrackerOptions)
 - `targetWindow?: Window` - Target window for postMessage (default: `window.parent`)
 - `targetOrigin?: string` - Target origin for postMessage (default: `'*'`)
 - `onMessage?: (message: TrackerMessage) => void` - Direct message callback; when set, bypasses postMessage
+- `scrollContainer?: HTMLElement` - Scroll container element; when set, reports this element's scroll state instead of window's and binds scroll events to it
 
 #### Methods
 
@@ -324,6 +325,7 @@ When `iframe` is `null` or omitted, the receiver operates in same-page mode: it 
 | `getElement(id)`                | Get a single element by ID                                 |
 | `getIframe()`                   | Get the bound iframe element (or `null` in same-page mode) |
 | `getIframeBounds()`             | Get iframe's bounding rect (or `null` in same-page mode)   |
+| `getContainerScroll()`          | Get the latest scroll container state from the tracker     |
 | `handleTrackerMessage(message)` | Directly process a TrackerMessage (for same-page mode)     |
 | `destroy()`                     | Clean up all resources                                     |
 
@@ -352,9 +354,14 @@ new OverlayPositioner(options: OverlayPositionerOptions)
 | `transformCoordinates(x, y, context?)`         | Transform iframe coordinates to CSS left/top                 |
 | `transformDimensions(width, height, context?)` | Transform dimensions to CSS width/height                     |
 | `scaleBorderRadius(radius, scale)`             | Scale border-radius values                                   |
+| `scaleTransformOrigin(origin, scaleX, scaleY)` | Scale transform-origin values                                |
 | `getIframeScale()`                             | Get iframe's combined transform/zoom scale                   |
 | `getIframeScaleSeparate()`                     | Get iframe's zoom and transform scales separately            |
 | `getAncestorScale()`                           | Get cumulative scale from ancestor elements                  |
+| `setContainer(container)`                      | Update the container reference dynamically                   |
+| `setIframe(iframe)`                            | Update the iframe reference dynamically                      |
+| `getIframe()`                                  | Get the current iframe element                               |
+| `getContainer()`                               | Get the current container element                            |
 
 ### ElementRect
 

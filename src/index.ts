@@ -24,4 +24,4 @@ export type {
   OverlayPositionerOptions,
 } from './shared/types';
 
-export { MESSAGE_TYPE, DEFAULT_THROTTLE_DELAY } from './shared/constants';
+export { MESSAGE_TYPE } from './shared/constants';

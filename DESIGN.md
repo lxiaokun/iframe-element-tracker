@@ -76,10 +76,17 @@ interface ElementRect {
   id: string; // 元素唯一标识
   timestamp: number; // 最后更新时间戳
 
+  // ===== DOM 属性 =====
+  attributes: {
+    elementId: string; // 元素的 id 属性
+    classList: string[]; // 元素的 class 列表
+    dataset: Record<string, string>; // 元素的 data-* 属性
+  };
+
   // ===== 位置和尺寸 =====
   bounds: {
-    x: number; // 相对于宿主页面的 x 坐标
-    y: number; // 相对于宿主页面的 y 坐标
+    x: number; // 相对于 iframe 视口的 x 坐标
+    y: number; // 相对于 iframe 视口的 y 坐标
     width: number; // 元素宽度
     height: number; // 元素高度
   };
@@ -144,7 +151,7 @@ interface ElementRect {
   };
 
   // ===== 用户自定义数据 =====
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 interface Spacing {
@@ -171,17 +178,29 @@ interface Spacing {
 ```typescript
 class ElementTracker {
   /**
+   * 构造函数
+   * @param options - 配置选项
+   */
+  constructor(options?: {
+    targetWindow?: Window; // postMessage 的目标窗口，默认 window.parent
+    targetOrigin?: string; // postMessage 的目标 origin，默认 '*'
+    onMessage?: (message: TrackerMessage) => void; // 直接消息回调，设置后跳过 postMessage
+    scrollContainer?: HTMLElement; // 滚动容器元素，默认为 window
+  });
+
+  /**
    * 注册需要追踪的元素
-   * @param element - DOM 元素或选择器
+   * @param element - DOM 元素
+   * @param id - 唯一标识
    * @param options - 配置选项
    */
   register(
-    element: HTMLElement | string,
+    element: Element,
+    id: string,
     options?: {
-      id?: string; // 自定义 ID
-      metadata?: Record<string, any>; // 自定义数据
+      metadata?: Record<string, unknown>; // 自定义数据
     },
-  ): string;
+  ): void;
 
   /**
    * 取消注册元素
@@ -189,9 +208,25 @@ class ElementTracker {
   unregister(id: string): void;
 
   /**
+   * 更新元素的 metadata
+   */
+  updateMetadata(id: string, metadata: Record<string, unknown>): void;
+
+  /**
    * 手动触发更新
    */
-  forceUpdate(id?: string): void;
+  forceUpdate(): void;
+
+  /**
+   * 添加消息监听器，自动回放当前状态
+   * 返回取消订阅函数
+   */
+  addMessageListener(listener: (message: TrackerMessage) => void): () => void;
+
+  /**
+   * 移除消息监听器
+   */
+  removeMessageListener(listener: (message: TrackerMessage) => void): void;
 
   /**
    * 销毁 SDK 实例
@@ -206,9 +241,15 @@ class ElementTracker {
 class ElementReceiver {
   /**
    * 构造函数
-   * @param iframe - iframe DOM 元素
+   * @param iframe - iframe DOM 元素，传入 null 则进入同页模式
+   * @param options - 配置选项
    */
-  constructor(iframe: HTMLIFrameElement);
+  constructor(
+    iframe?: HTMLIFrameElement | null,
+    options?: {
+      allowedOrigin?: string; // 允许的消息来源，默认 '*'
+    },
+  );
 
   /**
    * 监听事件
@@ -217,7 +258,7 @@ class ElementReceiver {
    */
   on(event: 'init', callback: (elements: ElementRect[]) => void): void;
   on(event: 'update', callback: (elements: ElementRect[]) => void): void;
-  on(event: 'remove', callback: (elements: { id: string }[]) => void): void;
+  on(event: 'remove', callback: (elements: ElementRect[]) => void): void;
 
   /**
    * 取消监听
@@ -233,6 +274,26 @@ class ElementReceiver {
    * 获取单个元素
    */
   getElement(id: string): ElementRect | undefined;
+
+  /**
+   * 获取绑定的 iframe 元素（同页模式返回 null）
+   */
+  getIframe(): HTMLIFrameElement | null;
+
+  /**
+   * 获取 iframe 的边界矩形（同页模式返回 null）
+   */
+  getIframeBounds(): DOMRect | null;
+
+  /**
+   * 获取滚动容器的最新状态
+   */
+  getContainerScroll(): ContainerScroll | undefined;
+
+  /**
+   * 直接处理 TrackerMessage（用于同页模式）
+   */
+  handleTrackerMessage(message: TrackerMessage): void;
 
   /**
    * 销毁 SDK 实例
@@ -352,13 +413,19 @@ ElementReceiver 提供三种事件：
 
 ```typescript
 // ElementTracker → ElementReceiver
-type TrackerMessage =
-  | { type: 'INIT'; elements: ElementRect[] }
-  | { type: 'UPDATE'; elements: ElementRect[] }
-  | { type: 'REMOVE'; elements: { id: string }[] };
+interface TrackerMessage {
+  type: string; // 消息类型标识 ('IFRAME_ELEMENT_TRACKER')
+  action: 'init' | 'update' | 'remove';
+  elements: ElementRect[];
+  containerScroll?: ContainerScroll; // 滚动容器状态
+}
 
-// 可扩展：ElementReceiver → ElementTracker (未来可能需要)
-type ReceiverMessage = { type: 'PING' } | { type: 'REQUEST_UPDATE' };
+interface ContainerScroll {
+  scrollX: number;
+  scrollY: number;
+  scrollWidth: number;
+  scrollHeight: number;
+}
 ```
 
 ### 安全性考虑
@@ -372,9 +439,8 @@ type ReceiverMessage = { type: 'PING' } | { type: 'REQUEST_UPDATE' };
 ### 追踪层优化
 
 1. **批量更新**：使用 requestAnimationFrame 合并多个元素的更新
-2. **防抖/节流**：对高频事件（scroll, resize）进行节流
-3. **按需追踪**：使用 IntersectionObserver 只追踪可见元素
-4. **差量更新**：只发送变化的属性，而非整个对象
+2. **低延迟**：滚动和 resize 事件同步更新以保证实时响应
+3. **按需追踪**：使用 IntersectionObserver 监控元素可见性变化
 
 ### 渲染层优化
 
@@ -387,23 +453,44 @@ type ReceiverMessage = { type: 'PING' } | { type: 'REQUEST_UPDATE' };
 ```
 iframe-overlay/
 ├── src/
+│   ├── index.ts               # 公开入口 - 重新导出所有模块
 │   ├── shared/
 │   │   ├── types.ts           # 类型定义
 │   │   ├── constants.ts       # 常量（消息类型等）
-│   │   └── utils.ts           # 工具函数
+│   │   └── index.ts           # 重新导出
 │   ├── tracker/
 │   │   └── index.ts           # ElementTracker 实现
-│   └── receiver/
-│       └── index.ts           # ElementReceiver 实现
+│   ├── receiver/
+│   │   └── index.ts           # ElementReceiver 实现
+│   └── overlay-positioner/
+│       └── index.ts           # OverlayPositioner 实现（坐标变换）
+├── tests/
+│   ├── helpers/
+│   │   ├── fixtures.ts        # ElementRect/ScaleContext 工厂函数
+│   │   └── dom-mocks.ts       # ResizeObserver/IntersectionObserver 存根
+│   ├── unit/
+│   │   ├── overlay-positioner.test.ts
+│   │   ├── receiver.test.ts
+│   │   └── tracker.test.ts
+│   └── e2e/
+│       └── overlay.spec.ts
 ├── demo/
 │   ├── host.html              # 宿主页面
 │   ├── host.ts                # 宿主页面逻辑（含 overlay 渲染）
 │   ├── inner.html             # iframe 内页面
-│   └── inner.ts               # iframe 内页面逻辑
+│   ├── inner.ts               # iframe 内页面逻辑
+│   ├── benchmark.html         # 性能基准测试页面
+│   └── benchmark.ts           # 基准测试逻辑
 ├── package.json
 ├── tsconfig.json
 ├── vite.config.ts
-└── README.md
+├── vite.config.lib.ts         # 库构建配置
+├── vitest.config.ts           # 单元测试配置
+├── playwright.config.ts       # E2E 测试配置
+├── eslint.config.mjs          # ESLint 配置
+├── commitlint.config.mjs      # Commitlint 配置
+├── README.md
+└── README.zh-CN.md
 ```
 
 ## 使用示例
@@ -416,11 +503,11 @@ import { ElementTracker } from '../src/tracker';
 const tracker = new ElementTracker();
 
 // 注册元素
-tracker.register('#button1', {
+tracker.register(document.getElementById('button1')!, 'button1', {
   metadata: { label: 'Primary Button' },
 });
 
-tracker.register('.card', {
+tracker.register(document.querySelector('.card')!, 'card', {
   metadata: { label: 'Card Component' },
 });
 ```
@@ -429,8 +516,9 @@ tracker.register('.card', {
 
 ```typescript
 import { ElementReceiver } from '../src/receiver';
+import type { ElementRect } from '../src/shared/types';
 
-const iframe = document.getElementById('inner-frame');
+const iframe = document.getElementById('inner-frame') as HTMLIFrameElement;
 const receiver = new ElementReceiver(iframe);
 
 // 监听初始化
@@ -465,10 +553,11 @@ function createOverlay(elementRect: ElementRect) {
 ## 未来扩展
 
 1. **双向通信**：宿主页面向 iframe 发送指令
-2. **更多追踪信息**：伪元素、Shadow DOM、视频帧内容
-3. **性能监控**：内置性能指标收集
-4. **调试工具**：开发者工具插件，可视化追踪状态
-5. **预设模板**：提供常见 overlay 样式的预设
+2. **差量更新**：只发送变化的属性，减少通信数据量
+3. **更多追踪信息**：伪元素、Shadow DOM、视频帧内容
+4. **性能监控**：内置性能指标收集
+5. **调试工具**：开发者工具插件，可视化追踪状态
+6. **预设模板**：提供常见 overlay 样式的预设
 
 ## 总结
 
