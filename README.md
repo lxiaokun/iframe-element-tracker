@@ -55,6 +55,7 @@ When you need to annotate iframe elements, annotations rendered inside the ifram
 - **Rich Element Information**: Comprehensive data including bounds, visibility, CSS styles, transforms, and more
 - **Framework Agnostic**: Pure data layer SDK, no UI framework dependency
 - **High Performance**: Optimized with ResizeObserver, IntersectionObserver, and efficient update batching
+- **Occlusion Detection**: Detect ancestor overflow clipping and z-index occlusion, with automatic clip-path rendering for overlays
 - **TypeScript Support**: Full type definitions included
 
 ## Installation
@@ -182,6 +183,48 @@ const dimensions = positioner.transformDimensions(bounds.width, bounds.height, c
 const borderRadius = positioner.scaleBorderRadius(styles.border.radius, context.iframeScale.scaleX);
 ```
 
+### Occlusion Detection
+
+ElementTracker automatically detects when tracked elements are clipped by ancestor `overflow:hidden/auto/scroll` containers. The `visibility.visibleBounds` field accounts for ancestor overflow clipping (per-axis: `overflow-x` and `overflow-y` are checked independently).
+
+For z-index occlusion detection (detecting elements covering the tracked element), enable the `detectOcclusion` option:
+
+```typescript
+// Enable z-index occlusion detection globally
+const tracker = new ElementTracker({
+  detectOcclusion: true,
+});
+
+// Or per-element
+tracker.register(element, 'my-element', {
+  detectOcclusion: true,
+});
+```
+
+When occlusion detection is enabled, each `ElementRect` includes an `occlusion` field with clip bounds and occluder information.
+
+On the host side, `OverlayPositioner` automatically applies `clip-path` to overlays based on occlusion data:
+
+- Overflow clipping → `clip-path: inset(...)` with negative margins on unclipped sides
+- Z-index occlusion → `clip-path: path(evenodd, ...)` with holes for occluders
+
+```typescript
+const positioner = new OverlayPositioner({
+  iframe,
+  container: overlayContainer,
+  clipOverflowMargin: 100, // margin (px) for unclipped sides (default: 100)
+});
+
+// applyOverlayStyle() automatically applies clip-path
+positioner.applyOverlayStyle(overlay, elementRect);
+
+// Or get the clip-path value manually
+const style = positioner.getOverlayStyle(elementRect);
+if (style?.clipPath) {
+  overlay.style.clipPath = style.clipPath;
+}
+```
+
 ## Same-Page Tracking
 
 In addition to the cross-iframe tracking mode, the SDK supports **same-page tracking** — rendering overlay annotations directly within the same page as the tracked elements, without requiring an iframe.
@@ -286,6 +329,7 @@ new ElementTracker(options?: TrackerOptions)
 - `targetOrigin?: string` - Target origin for postMessage (default: `'*'`)
 - `onMessage?: (message: TrackerMessage) => void` - Direct message callback; when set, bypasses postMessage
 - `scrollContainer?: HTMLElement` - Scroll container element; when set, reports this element's scroll state instead of window's and binds scroll events to it
+- `detectOcclusion?: boolean` - Enable z-index occlusion detection globally for all registered elements (default: `false`)
 
 #### Methods
 
@@ -297,7 +341,15 @@ new ElementTracker(options?: TrackerOptions)
 | `forceUpdate()`                   | Manually trigger an update                                                        |
 | `addMessageListener(listener)`    | Add a message listener; auto-replays current state (returns unsubscribe function) |
 | `removeMessageListener(listener)` | Remove a previously added message listener                                        |
+| `getLastUpdateDuration()`         | Get the duration (ms) of the last update cycle                                    |
 | `destroy()`                       | Clean up all resources                                                            |
+
+**RegisterOptions:**
+
+| Option             | Description                                                                        |
+| ------------------ | ---------------------------------------------------------------------------------- |
+| `metadata?`        | Custom user data attached to the element                                           |
+| `detectOcclusion?` | Enable z-index occlusion detection for this element (overrides the global setting) |
 
 ### ElementReceiver
 
@@ -343,6 +395,7 @@ new OverlayPositioner(options: OverlayPositionerOptions)
 
 - `iframe: HTMLIFrameElement` - The iframe element
 - `container: HTMLElement` - The overlay container element
+- `clipOverflowMargin?: number` - Margin (px) for unclipped sides when generating `clip-path: inset(...)` (default: `100`)
 
 #### Methods
 
@@ -406,6 +459,64 @@ interface ElementRect {
 
   scroll?: {...};                // Scroll state if scrollable
   metadata?: Record<string, any>; // Custom user data
+  occlusion?: OcclusionInfo;     // Occlusion detection results (when enabled)
+}
+```
+
+### OcclusionInfo & OccluderRect
+
+Types for occlusion detection results:
+
+```typescript
+interface OccluderRect {
+  elementTag: string; // Tag name of the occluding element
+  elementId: string; // id attribute of the occluder
+  bounds: {
+    // Occluder bounds relative to iframe viewport
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+}
+
+interface OcclusionInfo {
+  clipBounds: {
+    // Visible area after ancestor overflow clipping
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null;
+  occluders: OccluderRect[]; // List of elements occluding the tracked element
+}
+```
+
+### OverlayStyle
+
+The style object returned by `getOverlayStyle()`:
+
+```typescript
+interface OverlayStyle {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  borderRadius: string;
+  clipPath: string | null; // clip-path for overflow clipping / z-index occlusion
+}
+```
+
+### TrackerMessage
+
+The message sent from ElementTracker:
+
+```typescript
+interface TrackerMessage {
+  type: string; // Message type
+  elements: ElementRect[]; // Element data
+  updateDuration?: number; // Duration (ms) of the update cycle (for performance monitoring)
+  // ...
 }
 ```
 
@@ -416,6 +527,11 @@ interface ElementRect {
 - **Analytics**: Monitor user interactions with specific elements
 - **Accessibility Tools**: Build accessibility overlays and helpers
 - **Design Tools**: Create visual editors that work across iframe boundaries
+
+## Documentation
+
+- [Quick Reference](./docs/QUICK_REFERENCE.md) — Concise cheat-sheet covering common usage patterns
+- [Quick Reference (中文)](./docs/QUICK_REFERENCE.zh-CN.md) — 快速参考（中文版）
 
 ## Testing
 
