@@ -55,6 +55,7 @@ receiver.on('update', (elements) => {
 - **丰富的元素信息**：包含边界、可见性、CSS 样式、变换等完整数据
 - **框架无关**：纯数据层 SDK，不依赖任何 UI 框架
 - **高性能**：基于 ResizeObserver、IntersectionObserver 优化，高效的更新批处理
+- **遮挡检测**：检测祖先元素 overflow 裁剪和 z-index 遮挡，自动生成覆盖层 clip-path
 - **TypeScript 支持**：包含完整的类型定义
 
 ## 安装
@@ -182,6 +183,48 @@ const dimensions = positioner.transformDimensions(bounds.width, bounds.height, c
 const borderRadius = positioner.scaleBorderRadius(styles.border.radius, context.iframeScale.scaleX);
 ```
 
+### 遮挡检测
+
+ElementTracker 会自动检测被追踪元素是否被祖先元素的 `overflow:hidden/auto/scroll` 容器裁剪。`visibility.visibleBounds` 字段会考虑祖先元素的 overflow 裁剪（按轴独立检测 `overflow-x` 和 `overflow-y`）。
+
+如需检测 z-index 遮挡（检测覆盖在被追踪元素上方的其他元素），启用 `detectOcclusion` 选项：
+
+```typescript
+// 全局启用 z-index 遮挡检测
+const tracker = new ElementTracker({
+  detectOcclusion: true,
+});
+
+// 或按元素启用
+tracker.register(element, 'my-element', {
+  detectOcclusion: true,
+});
+```
+
+启用遮挡检测后，每个 `ElementRect` 会包含 `occlusion` 字段，提供裁剪边界和遮挡元素信息。
+
+在宿主页面端，`OverlayPositioner` 会根据遮挡数据自动为覆盖层应用 `clip-path`：
+
+- overflow 裁剪 → `clip-path: inset(...)`，未裁剪方向使用负边距
+- z-index 遮挡 → `clip-path: path(evenodd, ...)`，为遮挡元素留出镂空区域
+
+```typescript
+const positioner = new OverlayPositioner({
+  iframe,
+  container: overlayContainer,
+  clipOverflowMargin: 100, // 未裁剪方向的边距（px）（默认：100）
+});
+
+// applyOverlayStyle() 会自动应用 clip-path
+positioner.applyOverlayStyle(overlay, elementRect);
+
+// 或手动获取 clip-path 值
+const style = positioner.getOverlayStyle(elementRect);
+if (style?.clipPath) {
+  overlay.style.clipPath = style.clipPath;
+}
+```
+
 ## 同页面追踪
 
 除了跨 iframe 追踪模式外，SDK 还支持**同页面追踪**——直接在被追踪元素所在的同一页面中渲染覆盖层标注，无需 iframe。
@@ -286,6 +329,7 @@ new ElementTracker(options?: TrackerOptions)
 - `targetOrigin?: string` - postMessage 的目标 origin（默认：`'*'`）
 - `onMessage?: (message: TrackerMessage) => void` - 直接消息回调；设置后跳过 postMessage
 - `scrollContainer?: HTMLElement` - 滚动容器元素；设置后上报该元素的滚动状态而非 window 的，并将滚动事件绑定到该元素
+- `detectOcclusion?: boolean` - 全局启用 z-index 遮挡检测（默认：`false`）
 
 #### 方法
 
@@ -297,7 +341,15 @@ new ElementTracker(options?: TrackerOptions)
 | `forceUpdate()`                   | 手动触发更新                                         |
 | `addMessageListener(listener)`    | 添加消息监听器；自动回放当前状态（返回取消订阅函数） |
 | `removeMessageListener(listener)` | 移除之前添加的消息监听器                             |
+| `getLastUpdateDuration()`         | 获取最近一次更新周期的耗时（毫秒）                   |
 | `destroy()`                       | 清理所有资源                                         |
+
+**RegisterOptions：**
+
+| 选项               | 描述                                          |
+| ------------------ | --------------------------------------------- |
+| `metadata?`        | 附加到元素的自定义用户数据                    |
+| `detectOcclusion?` | 为此元素启用 z-index 遮挡检测（覆盖全局设置） |
 
 ### ElementReceiver
 
@@ -343,6 +395,7 @@ new OverlayPositioner(options: OverlayPositionerOptions)
 
 - `iframe: HTMLIFrameElement` - iframe 元素
 - `container: HTMLElement` - 覆盖层容器元素
+- `clipOverflowMargin?: number` - 生成 `clip-path: inset(...)` 时未裁剪方向的边距（px）（默认：`100`）
 
 #### 方法
 
@@ -406,6 +459,64 @@ interface ElementRect {
 
   scroll?: {...};                // 滚动状态（如果可滚动）
   metadata?: Record<string, any>; // 用户自定义数据
+  occlusion?: OcclusionInfo;     // 遮挡检测结果（启用后）
+}
+```
+
+### OcclusionInfo 与 OccluderRect
+
+遮挡检测结果的类型定义：
+
+```typescript
+interface OccluderRect {
+  elementTag: string; // 遮挡元素的标签名
+  elementId: string; // 遮挡元素的 id 属性
+  bounds: {
+    // 遮挡元素相对于 iframe 视口的边界
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+}
+
+interface OcclusionInfo {
+  clipBounds: {
+    // 经过祖先 overflow 裁剪后的可见区域
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null;
+  occluders: OccluderRect[]; // 遮挡被追踪元素的元素列表
+}
+```
+
+### OverlayStyle
+
+`getOverlayStyle()` 返回的样式对象：
+
+```typescript
+interface OverlayStyle {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  borderRadius: string;
+  clipPath: string | null; // 用于 overflow 裁剪 / z-index 遮挡的 clip-path
+}
+```
+
+### TrackerMessage
+
+ElementTracker 发送的消息类型：
+
+```typescript
+interface TrackerMessage {
+  type: string; // 消息类型
+  elements: ElementRect[]; // 元素数据
+  updateDuration?: number; // 更新周期耗时（毫秒），用于性能监控
+  // ...
 }
 ```
 
@@ -416,6 +527,11 @@ interface ElementRect {
 - **数据分析**：监控用户与特定元素的交互
 - **无障碍工具**：构建无障碍覆盖层和辅助工具
 - **设计工具**：创建跨 iframe 边界工作的可视化编辑器
+
+## 文档
+
+- [快速参考](./docs/QUICK_REFERENCE.md) — 常用模式速查表（英文）
+- [快速参考（中文）](./docs/QUICK_REFERENCE.zh-CN.md) — 常用模式速查表
 
 ## 测试
 

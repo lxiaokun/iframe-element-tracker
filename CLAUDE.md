@@ -11,6 +11,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **ElementTracker**: Runs inside the iframe, registers and tracks DOM elements
 - **ElementReceiver**: Runs in the host page, receives element data and emits events
 - **ElementRect**: The data structure containing all tracked element information (bounds, visibility, styles, attributes, etc.)
+- **OcclusionInfo**: Tracks ancestor overflow clipping and z-index occlusion data for each element
+- **OverlayPositioner**: Runs in the host page, transforms iframe coordinates to overlay CSS coordinates, including clip-path for clipped/occluded elements
 
 ### Prerequisites
 
@@ -101,6 +103,32 @@ The dev server runs at http://localhost:3000, demo page at http://localhost:3000
   - iframe border width
   - overlay container offset (if container extends beyond iframe)
 
+### Coordinate System Pitfalls
+
+**CRITICAL**: ElementRect fields use the **iframe viewport** coordinate system. When converting to document coordinates for overlay rendering, ALL coordinate fields must be converted together:
+
+- `bounds` — element position and size
+- `visibility.visibleBounds` — visible area after clipping
+- `occlusion.clipBounds` — ancestor overflow clip rect
+- `occlusion.occluders[].bounds` — occluder positions
+
+If `bounds` is converted to document coordinates but `visibleBounds` is left in viewport coordinates, `computeClipPath()` will calculate incorrect insets (potentially hundreds of pixels), effectively hiding the overlay.
+
+**Pattern in `host.ts`**: The `toDocumentBounds()` helper must be applied to ALL bounds fields, not just `bounds`:
+
+```typescript
+// WRONG — only converts bounds, visibleBounds stays viewport-relative
+const docRect = { ...elementRect, bounds: toDocumentBounds(elementRect.bounds, scroll) };
+
+// RIGHT — converts all coordinate fields together
+const docRect = {
+  ...elementRect,
+  bounds: toDocumentBounds(elementRect.bounds, scroll),
+  visibility: { ...elementRect.visibility, visibleBounds: toDocumentBounds(visibleBounds, scroll) },
+  occlusion: { clipBounds: toDocumentBounds(clipBounds, scroll), occluders: ... },
+};
+```
+
 ### Transform Handling
 
 For elements with CSS transforms:
@@ -108,6 +136,33 @@ For elements with CSS transforms:
 - `getBoundingClientRect()` returns the axis-aligned bounding box (AABB) of the transformed element
 - SDK uses `offsetWidth/offsetHeight` for original dimensions
 - Position is calculated from bounding box center
+
+### Occlusion Detection
+
+Two types of element occlusion are detected:
+
+1. **Ancestor overflow clipping** (always enabled): Walks the DOM ancestor chain to find elements with `overflow:hidden/auto/scroll`. Computes the intersection of all clipping ancestors' rects with the viewport to produce `visibleBounds`. Per-axis: `overflow-x` and `overflow-y` are checked independently.
+
+2. **Z-index occlusion** (opt-in via `detectOcclusion`): Uses `elementFromPoint()` grid sampling across the element's visible area to detect overlapping elements. Returns an array of `OccluderRect` with each occluder's bounds.
+
+**Overlay rendering**: `OverlayPositioner.computeClipPath()` converts occlusion data to CSS clip-path:
+
+- Overflow clipping only → `clip-path: inset(top right bottom left)` with negative margins on unclipped sides (allows labels/toolbars to overflow)
+- Z-index occlusion → `clip-path: path(evenodd, "...")` with outer rect + counterclockwise hole rects
+
+**Two overlay rendering paths exist** (both must handle clipping):
+
+- Host overlay: `demo/host.ts` → `OverlayPositioner.applyOverlayStyle()` — handles clip-path automatically
+- Inner overlay: `demo/inner.ts` → `computeLocalClipPath()` — separate implementation for same-page mode
+
+## Deep-Dive References
+
+Detailed analysis documents for AI-assisted development (not user-facing):
+
+- [`.claude/references/DESIGN.md`](.claude/references/DESIGN.md) — Original design document (Chinese), architecture rationale and API design decisions
+- [`.claude/references/CODEBASE_ANALYSIS.md`](.claude/references/CODEBASE_ANALYSIS.md) — Merged codebase analysis: ElementTracker, ElementReceiver, OverlayPositioner internals, data flow, event system, demo structure
+- [`.claude/references/COORDINATE_TRANSFORMATION_GUIDE.md`](.claude/references/COORDINATE_TRANSFORMATION_GUIDE.md) — Coordinate transformation math: CSS zoom vs transform, margin/content scaling, transform matrix parsing, the complete 6-step formula
+- [`.claude/references/ARCHITECTURE_DIAGRAM.md`](.claude/references/ARCHITECTURE_DIAGRAM.md) — ASCII architecture diagrams: component relationships, observer stack, bounds calculation flow, message sequence
 
 ## Code Style
 
@@ -134,7 +189,9 @@ After completing a feature, always follow these steps in order:
 - `src/shared/types.ts` - All TypeScript interfaces (ElementRect, ElementAttributes, ElementStyles, etc.)
 - `src/tracker/index.ts` - ElementTracker implementation with observers and update logic
 - `src/receiver/index.ts` - ElementReceiver implementation with event system
+- `src/overlay-positioner/index.ts` - OverlayPositioner with coordinate transforms and clip-path computation
 - `demo/host.ts` - Example of how to render overlays based on tracked element data
+- `demo/inner.ts` - Inner overlay rendering with local clip-path (second overlay rendering path)
 
 ## Testing Changes
 
@@ -142,12 +199,24 @@ After making changes:
 
 1. Run `npx tsc --noEmit` to check for type errors
 2. Run `npm test` to execute unit tests
-3. Open http://localhost:3000/demo/host.html in browser
-4. Test scroll tracking (should be real-time, no delay)
-5. Test different overlay modes (Passthrough, Interactive, Labeled, Rich)
-6. Verify overlays align correctly with tracked elements
-7. Check that overlays can extend beyond iframe boundaries (in Labeled/Rich modes)
-8. Run `npm run test:e2e` for full E2E verification
+3. **Visual verification BEFORE writing E2E tests** — Open http://localhost:3000/demo/host.html in browser:
+   - Test scroll tracking (should be real-time, no delay)
+   - Test different overlay modes (Passthrough, Interactive, Labeled, Rich)
+   - Verify overlays align correctly with tracked elements
+   - **Verify clipped elements**: overlay boundaries should match the overflow container, not the element's full size
+   - **Verify occluded elements**: overlay should have holes where occluders cover
+   - **Toggle Clip button** to compare clipped vs unclipped overlays
+   - **Enable Inner Overlay** and verify it also clips correctly
+   - Check that overlays can extend beyond iframe boundaries (in Labeled/Rich modes)
+   - Toggle iframe styles (zoom, scale, margin) and verify overlays still align
+4. Run `npm run test:e2e` for full E2E verification
+
+### E2E Test Guidelines
+
+- **Never test only string format** — `expect(clipPath).toContain('inset(')` misses completely wrong values
+- **Verify visual bounds** — Check that clip-path inset values are within the element's dimensions
+- **Test coordinate consistency** — When scrolling is involved, verify bounds and visibleBounds are in the same coordinate system
+- **Test both overlay paths** — Host overlay (via OverlayPositioner) AND inner overlay (via computeLocalClipPath)
 
 ## Debugging Guidelines
 
