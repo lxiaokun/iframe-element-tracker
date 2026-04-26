@@ -63,6 +63,7 @@ export function createElementRect(
       ...overrides.styles,
     },
     metadata: overrides.metadata,
+    occlusion: overrides.occlusion,
   };
 }
 

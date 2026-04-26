@@ -583,4 +583,337 @@ describe('ElementTracker', () => {
       errorSpy.mockRestore();
     });
   });
+
+  // ==================== ancestor overflow clipping ====================
+
+  describe('ancestor overflow clipping', () => {
+    let container: HTMLElement;
+
+    function setupClippingAncestor(
+      overflowX: string,
+      overflowY: string,
+      clipRect: { x: number; y: number; width: number; height: number },
+    ) {
+      container = document.createElement('div');
+      container.appendChild(testElement);
+      document.body.appendChild(container);
+
+      vi.spyOn(container, 'getBoundingClientRect').mockReturnValue({
+        ...clipRect,
+        top: clipRect.y,
+        left: clipRect.x,
+        right: clipRect.x + clipRect.width,
+        bottom: clipRect.y + clipRect.height,
+        toJSON: () => {},
+      });
+
+      const origGCS = window.getComputedStyle;
+      vi.spyOn(window, 'getComputedStyle').mockImplementation((el) => {
+        if (el === container) {
+          const base = origGCS(el);
+          return new Proxy(base, {
+            get(target, prop) {
+              if (prop === 'overflowX') return overflowX;
+              if (prop === 'overflowY') return overflowY;
+              return (target as any)[prop];
+            },
+          }) as CSSStyleDeclaration;
+        }
+        if (el === document.body) {
+          const base = origGCS(el);
+          return new Proxy(base, {
+            get(target, prop) {
+              if (prop === 'overflowX') return 'visible';
+              if (prop === 'overflowY') return 'visible';
+              return (target as any)[prop];
+            },
+          }) as CSSStyleDeclaration;
+        }
+        return origGCS(el);
+      });
+    }
+
+    afterEach(() => {
+      if (container && container.parentElement) {
+        // Move testElement back to body for other tests
+        document.body.appendChild(testElement);
+        container.remove();
+      }
+    });
+
+    it('clips visibleBounds to overflow:hidden ancestor', () => {
+      Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true });
+      Object.defineProperty(window, 'innerHeight', { value: 768, configurable: true });
+
+      setupClippingAncestor('hidden', 'hidden', { x: 120, y: 60, width: 160, height: 80 });
+
+      tracker.register(testElement, 'test-el');
+
+      const msg = mockTargetWindow.postMessage.mock.calls[0][0] as TrackerMessage;
+      const vis = msg.elements[0].visibility;
+      expect(vis.isVisible).toBe(true);
+      expect(vis.isFullyVisible).toBe(false);
+      expect(vis.visibleBounds).toEqual({ x: 120, y: 60, width: 160, height: 80 });
+    });
+
+    it('reports element fully inside overflow:hidden ancestor as fully visible', () => {
+      Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true });
+      Object.defineProperty(window, 'innerHeight', { value: 768, configurable: true });
+
+      setupClippingAncestor('hidden', 'hidden', { x: 0, y: 0, width: 500, height: 500 });
+
+      tracker.register(testElement, 'test-el');
+
+      const msg = mockTargetWindow.postMessage.mock.calls[0][0] as TrackerMessage;
+      const vis = msg.elements[0].visibility;
+      expect(vis.isVisible).toBe(true);
+      expect(vis.isFullyVisible).toBe(true);
+    });
+
+    it('reports element fully outside overflow:hidden ancestor as hidden', () => {
+      Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true });
+      Object.defineProperty(window, 'innerHeight', { value: 768, configurable: true });
+
+      setupClippingAncestor('hidden', 'hidden', { x: 500, y: 500, width: 100, height: 100 });
+
+      tracker.register(testElement, 'test-el');
+
+      const msg = mockTargetWindow.postMessage.mock.calls[0][0] as TrackerMessage;
+      const vis = msg.elements[0].visibility;
+      expect(vis.isVisible).toBe(false);
+      expect(vis.hiddenReason).toBe('offscreen');
+    });
+
+    it('handles per-axis overflow (overflow-x:hidden, overflow-y:visible)', () => {
+      Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true });
+      Object.defineProperty(window, 'innerHeight', { value: 768, configurable: true });
+
+      setupClippingAncestor('hidden', 'visible', { x: 120, y: 0, width: 160, height: 500 });
+
+      tracker.register(testElement, 'test-el');
+
+      const msg = mockTargetWindow.postMessage.mock.calls[0][0] as TrackerMessage;
+      const vis = msg.elements[0].visibility;
+      expect(vis.isVisible).toBe(true);
+      // X clipped: [100, 300] ∩ [120, 280] = [120, 280], width = 160
+      // Y unchanged: [50, 150], height = 100
+      expect(vis.visibleBounds).toEqual({ x: 120, y: 50, width: 160, height: 100 });
+    });
+
+    it('does not clip when ancestor has overflow:visible', () => {
+      Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true });
+      Object.defineProperty(window, 'innerHeight', { value: 768, configurable: true });
+
+      setupClippingAncestor('visible', 'visible', { x: 0, y: 0, width: 500, height: 500 });
+
+      tracker.register(testElement, 'test-el');
+
+      const msg = mockTargetWindow.postMessage.mock.calls[0][0] as TrackerMessage;
+      const vis = msg.elements[0].visibility;
+      expect(vis.isVisible).toBe(true);
+      expect(vis.isFullyVisible).toBe(true);
+      expect(vis.visibleBounds).toEqual({ x: 100, y: 50, width: 200, height: 100 });
+    });
+
+    it('accumulates clipping from multiple nested overflow:hidden ancestors', () => {
+      Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true });
+      Object.defineProperty(window, 'innerHeight', { value: 768, configurable: true });
+
+      const outer = document.createElement('div');
+      const inner = document.createElement('div');
+      outer.appendChild(inner);
+      inner.appendChild(testElement);
+      document.body.appendChild(outer);
+      container = outer; // So afterEach can clean up
+
+      vi.spyOn(outer, 'getBoundingClientRect').mockReturnValue({
+        x: 50,
+        y: 0,
+        width: 300,
+        height: 200,
+        top: 0,
+        left: 50,
+        right: 350,
+        bottom: 200,
+        toJSON: () => {},
+      });
+
+      vi.spyOn(inner, 'getBoundingClientRect').mockReturnValue({
+        x: 0,
+        y: 20,
+        width: 400,
+        height: 120,
+        top: 20,
+        left: 0,
+        right: 400,
+        bottom: 140,
+        toJSON: () => {},
+      });
+
+      const origGCS = window.getComputedStyle;
+      vi.spyOn(window, 'getComputedStyle').mockImplementation((el) => {
+        if (el === outer || el === inner) {
+          const base = origGCS(el);
+          return new Proxy(base, {
+            get(target, prop) {
+              if (prop === 'overflowX') return 'hidden';
+              if (prop === 'overflowY') return 'hidden';
+              return (target as any)[prop];
+            },
+          }) as CSSStyleDeclaration;
+        }
+        if (el === document.body) {
+          const base = origGCS(el);
+          return new Proxy(base, {
+            get(target, prop) {
+              if (prop === 'overflowX') return 'visible';
+              if (prop === 'overflowY') return 'visible';
+              return (target as any)[prop];
+            },
+          }) as CSSStyleDeclaration;
+        }
+        return origGCS(el);
+      });
+
+      tracker.register(testElement, 'test-el');
+
+      const msg = mockTargetWindow.postMessage.mock.calls[0][0] as TrackerMessage;
+      const vis = msg.elements[0].visibility;
+      expect(vis.isVisible).toBe(true);
+      // inner clips: (0, 20, 400, 120) -> x:[0,400], y:[20,140]
+      // outer clips: (50, 0, 300, 200) -> x:[50,350], y:[0,200]
+      // combined: x:[50,350], y:[20,140] => (50, 20, 300, 120)
+      // element (100,50,200,100) ∩ combined: x:100, y:50, right:300, bottom:140
+      // => (100, 50, 200, 90)
+      expect(vis.visibleBounds).toEqual({ x: 100, y: 50, width: 200, height: 90 });
+    });
+  });
+
+  // ==================== z-index occlusion detection ====================
+
+  describe('z-index occlusion detection', () => {
+    it('does not detect occluders when detectOcclusion is false', () => {
+      tracker.register(testElement, 'test-el');
+      const msg = mockTargetWindow.postMessage.mock.calls[0][0] as TrackerMessage;
+      const occlusion = msg.elements[0].occlusion;
+      expect(occlusion).toBeDefined();
+      expect(occlusion!.occluders).toEqual([]);
+    });
+
+    it('detects occluders when detectOcclusion is true', () => {
+      Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true });
+      Object.defineProperty(window, 'innerHeight', { value: 768, configurable: true });
+
+      // Create an occluding element
+      const occluder = document.createElement('div');
+      occluder.id = 'occluder';
+      vi.spyOn(occluder, 'getBoundingClientRect').mockReturnValue({
+        x: 120,
+        y: 60,
+        width: 80,
+        height: 40,
+        top: 60,
+        left: 120,
+        right: 200,
+        bottom: 100,
+        toJSON: () => {},
+      });
+      document.body.appendChild(occluder);
+
+      // Stub elementFromPoint (not available in jsdom)
+      document.elementFromPoint = vi.fn((x: number, y: number) => {
+        if (x >= 120 && x <= 200 && y >= 60 && y <= 100) {
+          return occluder;
+        }
+        return testElement;
+      });
+
+      // Mock body overflow to avoid body being treated as clipping ancestor
+      const origGCS = window.getComputedStyle;
+      vi.spyOn(window, 'getComputedStyle').mockImplementation((el) => {
+        if (el === document.body) {
+          const base = origGCS(el);
+          return new Proxy(base, {
+            get(target, prop) {
+              if (prop === 'overflowX') return 'visible';
+              if (prop === 'overflowY') return 'visible';
+              return (target as any)[prop];
+            },
+          }) as CSSStyleDeclaration;
+        }
+        return origGCS(el);
+      });
+
+      // Create tracker with detectOcclusion enabled
+      const occTracker = new ElementTracker({
+        targetWindow: mockTargetWindow as unknown as Window,
+        targetOrigin: '*',
+        detectOcclusion: true,
+      });
+
+      occTracker.register(testElement, 'test-el');
+
+      const msg = mockTargetWindow.postMessage.mock.calls[
+        mockTargetWindow.postMessage.mock.calls.length - 1
+      ][0] as TrackerMessage;
+      const occlusion = msg.elements[0].occlusion;
+      expect(occlusion).toBeDefined();
+      expect(occlusion!.occluders.length).toBeGreaterThan(0);
+      expect(occlusion!.occluders[0].elementId).toBe('occluder');
+      expect(occlusion!.occluders[0].elementTag).toBe('div');
+
+      occluder.remove();
+      occTracker.destroy();
+    });
+
+    it('returns empty occluders when element is not occluded', () => {
+      Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true });
+      Object.defineProperty(window, 'innerHeight', { value: 768, configurable: true });
+
+      // Stub elementFromPoint (not available in jsdom)
+      document.elementFromPoint = vi.fn(() => testElement);
+
+      const origGCS = window.getComputedStyle;
+      vi.spyOn(window, 'getComputedStyle').mockImplementation((el) => {
+        if (el === document.body) {
+          const base = origGCS(el);
+          return new Proxy(base, {
+            get(target, prop) {
+              if (prop === 'overflowX') return 'visible';
+              if (prop === 'overflowY') return 'visible';
+              return (target as any)[prop];
+            },
+          }) as CSSStyleDeclaration;
+        }
+        return origGCS(el);
+      });
+
+      const occTracker = new ElementTracker({
+        targetWindow: mockTargetWindow as unknown as Window,
+        targetOrigin: '*',
+        detectOcclusion: true,
+      });
+
+      occTracker.register(testElement, 'test-el');
+
+      const msg = mockTargetWindow.postMessage.mock.calls[
+        mockTargetWindow.postMessage.mock.calls.length - 1
+      ][0] as TrackerMessage;
+      const occlusion = msg.elements[0].occlusion;
+      expect(occlusion).toBeDefined();
+      expect(occlusion!.occluders).toEqual([]);
+
+      occTracker.destroy();
+    });
+
+    it('includes updateDuration in TrackerMessage', () => {
+      tracker.register(testElement, 'test-el');
+      // Init messages don't have updateDuration; trigger a forceUpdate
+      tracker.forceUpdate();
+      const updateMsg = mockTargetWindow.postMessage.mock.calls[1][0] as TrackerMessage;
+      expect(updateMsg.updateDuration).toBeDefined();
+      expect(typeof updateMsg.updateDuration).toBe('number');
+      expect(updateMsg.updateDuration).toBeGreaterThanOrEqual(0);
+    });
+  });
 });

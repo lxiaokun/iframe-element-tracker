@@ -31,10 +31,12 @@ import {
 export class OverlayPositioner {
   private iframe: HTMLIFrameElement;
   private container: HTMLElement;
+  private clipOverflowMargin: number;
 
   constructor(options: OverlayPositionerOptions) {
     this.iframe = options.iframe;
     this.container = options.container;
+    this.clipOverflowMargin = options.clipOverflowMargin ?? 100;
   }
 
   // ==================== HIGH-LEVEL API ====================
@@ -63,6 +65,9 @@ export class OverlayPositioner {
     // Scale border-radius
     const borderRadius = this.scaleBorderRadius(styles.border.radius, context.iframeScale.scaleX);
 
+    // Compute clip-path for ancestor overflow clipping and z-index occlusion
+    const clipPath = this.computeClipPath(elementRect, context);
+
     return {
       left: position.left,
       top: position.top,
@@ -75,6 +80,7 @@ export class OverlayPositioner {
         context.iframeScale.scaleX,
         context.iframeScale.scaleY,
       ),
+      clipPath,
     };
   }
 
@@ -111,6 +117,89 @@ export class OverlayPositioner {
     } else {
       overlay.style.transform = '';
     }
+
+    // Apply or clear clip-path for overflow clipping / occlusion
+    overlay.style.clipPath = style.clipPath ?? '';
+  }
+
+  // ==================== PRIVATE HELPERS ====================
+
+  /**
+   * Compute CSS clip-path from visibility and occlusion data.
+   * Returns null if no clipping needed.
+   */
+  private computeClipPath(elementRect: ElementRect, context: ScaleContext): string | null {
+    const { bounds, visibility } = elementRect;
+    const occlusion = elementRect.occlusion;
+    const visibleBounds = visibility.visibleBounds;
+
+    // No clipping needed if fully visible and no occluders
+    if (visibility.isFullyVisible && (!occlusion || occlusion.occluders.length === 0)) {
+      return null;
+    }
+
+    if (!visibleBounds) {
+      return null;
+    }
+
+    const EPS = 0.01;
+    const margin = this.clipOverflowMargin;
+
+    // Scale factor: iframe coordinates → overlay CSS coordinates
+    // CSS value = iframe_value * combinedScale / ancestorScale = iframe_value * iframeScale
+    const scaleX = context.combinedScale.scaleX / context.ancestorScale.scaleX;
+    const scaleY = context.combinedScale.scaleY / context.ancestorScale.scaleY;
+
+    // Compute insets in iframe coordinate space
+    const insetTop = visibleBounds.y - bounds.y;
+    const insetRight = bounds.x + bounds.width - (visibleBounds.x + visibleBounds.width);
+    const insetBottom = bounds.y + bounds.height - (visibleBounds.y + visibleBounds.height);
+    const insetLeft = visibleBounds.x - bounds.x;
+
+    const hasOccluders = occlusion && occlusion.occluders.length > 0;
+
+    if (hasOccluders) {
+      // Use path('evenodd', ...) with outer contour + occluder holes
+      // All coordinates relative to overlay top-left (0,0) in CSS px
+      const overlayW = bounds.width * scaleX;
+      const overlayH = bounds.height * scaleY;
+
+      // Outer contour: element area, extended by margin on unclipped sides, clamped on clipped sides
+      const outerTop = insetTop > EPS ? insetTop * scaleY : -margin;
+      const outerRight = insetRight > EPS ? overlayW - insetRight * scaleX : overlayW + margin;
+      const outerBottom = insetBottom > EPS ? overlayH - insetBottom * scaleY : overlayH + margin;
+      const outerLeft = insetLeft > EPS ? insetLeft * scaleX : -margin;
+
+      // Build SVG path: outer rect clockwise
+      let path = `M ${outerLeft} ${outerTop} L ${outerRight} ${outerTop} L ${outerRight} ${outerBottom} L ${outerLeft} ${outerBottom} Z`;
+
+      // Each occluder: counterclockwise rect (evenodd rule creates holes)
+      for (const occ of occlusion!.occluders) {
+        // Occluder bounds are in iframe viewport coords; convert to overlay-relative CSS coords
+        const occLeft = (occ.bounds.x - bounds.x) * scaleX;
+        const occTop = (occ.bounds.y - bounds.y) * scaleY;
+        const occRight = occLeft + occ.bounds.width * scaleX;
+        const occBottom = occTop + occ.bounds.height * scaleY;
+
+        // Counterclockwise for evenodd hole
+        path += ` M ${occLeft} ${occTop} L ${occLeft} ${occBottom} L ${occRight} ${occBottom} L ${occRight} ${occTop} Z`;
+      }
+
+      return `path(evenodd, '${path}')`;
+    }
+
+    // No occluders: use inset() for simplicity
+    // If all insets are effectively zero, no clip-path needed
+    if (insetTop <= EPS && insetRight <= EPS && insetBottom <= EPS && insetLeft <= EPS) {
+      return null;
+    }
+
+    const top = insetTop > EPS ? `${insetTop * scaleY}px` : `${-margin}px`;
+    const right = insetRight > EPS ? `${insetRight * scaleX}px` : `${-margin}px`;
+    const bottom = insetBottom > EPS ? `${insetBottom * scaleY}px` : `${-margin}px`;
+    const left = insetLeft > EPS ? `${insetLeft * scaleX}px` : `${-margin}px`;
+
+    return `inset(${top} ${right} ${bottom} ${left})`;
   }
 
   // ==================== LOW-LEVEL COMPOSABLE API ====================

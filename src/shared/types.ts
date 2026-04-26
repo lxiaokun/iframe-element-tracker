@@ -26,10 +26,32 @@ export interface ElementVisibility {
   isVisible: boolean;
   /** Whether fully visible (not clipped) */
   isFullyVisible: boolean;
-  /** Actual visible area (after clipping), null if not visible */
+  /** Actual visible area (after clipping by viewport and ancestor overflow), null if not visible */
   visibleBounds: Bounds | null;
   /** Reason for being hidden */
   hiddenReason?: 'offscreen' | 'hidden' | 'collapsed' | 'clipped';
+}
+
+/**
+ * Single occluder rectangle (an element covering part of the tracked element)
+ */
+export interface OccluderRect {
+  /** Tag name of the occluding element (for debugging) */
+  elementTag: string;
+  /** ID of the occluding element (for debugging) */
+  elementId: string;
+  /** Occluder bounds in iframe viewport coordinates (intersected with visible area) */
+  bounds: Bounds;
+}
+
+/**
+ * Occlusion information for a tracked element
+ */
+export interface OcclusionInfo {
+  /** Ancestor overflow clip bounds (single rect), null if no clipping ancestors */
+  clipBounds: Bounds | null;
+  /** List of elements covering the tracked element (only populated when detectOcclusion is enabled) */
+  occluders: OccluderRect[];
 }
 
 /**
@@ -113,6 +135,8 @@ export interface ElementRect {
   scroll?: ElementScroll;
   /** User-defined custom data */
   metadata?: Record<string, unknown>;
+  /** Occlusion information (ancestor clipping + z-index occlusion when opt-in) */
+  occlusion?: OcclusionInfo;
 }
 
 /**
@@ -142,6 +166,8 @@ export interface TrackerMessage {
   elements: ElementRect[];
   /** Scroll container state (window or user-specified scrollContainer) */
   containerScroll?: ContainerScroll;
+  /** Duration of the tracker's performUpdate() in milliseconds (for benchmarking) */
+  updateDuration?: number;
 }
 
 // ==================== Overlay Positioner Types ====================
@@ -180,6 +206,8 @@ export interface OverlayStyle {
   transform: string | null;
   /** Transform origin from tracked element */
   transformOrigin: string;
+  /** CSS clip-path for ancestor overflow clipping and z-index occlusion. null = no clipping */
+  clipPath: string | null;
 }
 
 /**
@@ -214,4 +242,10 @@ export interface OverlayPositionerOptions {
   container: HTMLElement;
   /** The iframe element being tracked */
   iframe: HTMLIFrameElement;
+  /**
+   * Extra margin (CSS px) for clip-path inset on unclipped sides,
+   * allowing labels/toolbars to overflow beyond the element boundary.
+   * Default: 100.
+   */
+  clipOverflowMargin?: number;
 }
