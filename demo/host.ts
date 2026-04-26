@@ -6,6 +6,7 @@ import type { ElementRect, Bounds, ContainerScroll } from '../src/shared';
 type OverlayMode = 'off' | 'passthrough' | 'interactive' | 'labeled' | 'rich';
 
 let currentMode: OverlayMode = 'passthrough';
+let hostClipEnabled = true;
 let receiver: ElementReceiver | null = null;
 let positioner: OverlayPositioner | null = null;
 
@@ -159,13 +160,36 @@ function updateOverlayStyle(overlay: HTMLElement, elementRect: ElementRect) {
   if (positioner) {
     const containerScroll = receiver?.getContainerScroll();
     if (containerScroll) {
+      const docBounds = toDocumentBounds(elementRect.bounds, containerScroll);
+      const docVisibleBounds = elementRect.visibility.visibleBounds
+        ? toDocumentBounds(elementRect.visibility.visibleBounds, containerScroll)
+        : null;
+      const docClipBounds = elementRect.occlusion?.clipBounds
+        ? toDocumentBounds(elementRect.occlusion.clipBounds, containerScroll)
+        : (elementRect.occlusion?.clipBounds ?? undefined);
+      const docOccluders = elementRect.occlusion?.occluders.map((occ) => ({
+        ...occ,
+        bounds: toDocumentBounds(occ.bounds, containerScroll),
+      }));
       const docRect = {
         ...elementRect,
-        bounds: toDocumentBounds(elementRect.bounds, containerScroll),
+        bounds: docBounds,
+        visibility: {
+          ...elementRect.visibility,
+          visibleBounds: docVisibleBounds,
+        },
+        occlusion: elementRect.occlusion
+          ? { clipBounds: docClipBounds ?? null, occluders: docOccluders ?? [] }
+          : undefined,
       };
       positioner.applyOverlayStyle(overlay, docRect);
     } else {
       positioner.applyOverlayStyle(overlay, elementRect);
+    }
+
+    // Clear clip-path when clip toggle is off
+    if (!hostClipEnabled) {
+      overlay.style.clipPath = '';
     }
   }
 
@@ -608,6 +632,36 @@ function setInnerMode(mode: InnerOverlayMode) {
 
 Object.entries(innerModeButtons).forEach(([mode, btn]) => {
   btn.addEventListener('click', () => setInnerMode(mode as InnerOverlayMode));
+});
+
+// Clip toggle buttons
+const hostClipToggle = document.getElementById('host-clip-toggle')!;
+const innerClipToggle = document.getElementById('inner-clip-toggle')!;
+
+hostClipToggle.addEventListener('click', () => {
+  hostClipEnabled = !hostClipEnabled;
+  hostClipToggle.classList.toggle('active', hostClipEnabled);
+
+  // Re-render all overlays to apply/clear clip-path
+  if (receiver) {
+    receiver.getElements().forEach((el) => {
+      updateOverlay(el);
+    });
+  }
+});
+
+innerClipToggle.addEventListener('click', () => {
+  const isActive = innerClipToggle.classList.toggle('active');
+
+  // Send clip toggle to iframe
+  iframe.contentWindow?.postMessage(
+    {
+      type: 'OVERLAY_CONTROL',
+      action: 'setClip',
+      enabled: isActive,
+    },
+    '*',
+  );
 });
 
 // Initialize after iframe loads
