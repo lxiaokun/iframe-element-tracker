@@ -321,6 +321,85 @@
       </div>
     </div>
 
+    <h2 style="font-size: 16px; margin-top: 30px; margin-bottom: 4px; color: #fff">
+      Occlusion Detection Benchmark
+    </h2>
+    <p class="subtitle">
+      Comparing tracker-side <code>performUpdate()</code> cost: baseline vs with occlusion detection
+      enabled.
+    </p>
+
+    <div class="control-bar">
+      <div class="control-info">Tracker Samples: <span id="occ-sample-count">0</span></div>
+      <div class="speedup-badge" id="occ-overhead-badge">Overhead: --</div>
+    </div>
+
+    <div class="benchmark-layout">
+      <!-- Left: Baseline -->
+      <div class="bench-side new">
+        <h2>Baseline (overflow only)</h2>
+        <p class="method-desc">
+          Tracker performUpdate() with ancestor overflow clipping only (default)
+        </p>
+        <div class="bench-iframe-wrapper">
+          <iframe id="iframe-baseline" src="./inner.html"></iframe>
+          <div class="overlay-container-old" id="overlay-container-baseline"></div>
+        </div>
+        <div class="stats-panel">
+          <div class="stats-grid">
+            <div class="stat-item">
+              <span class="stat-label">avg</span>
+              <span class="stat-value" id="stat-baseline-avg">--</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">p50</span>
+              <span class="stat-value" id="stat-baseline-p50">--</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">p95</span>
+              <span class="stat-value" id="stat-baseline-p95">--</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">max</span>
+              <span class="stat-value" id="stat-baseline-max">--</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: With Occlusion Detection -->
+      <div class="bench-side old">
+        <h2>With Occlusion Detection</h2>
+        <p class="method-desc">
+          Tracker performUpdate() with detectOcclusion=true (elementFromPoint sampling)
+        </p>
+        <div class="bench-iframe-wrapper">
+          <iframe id="iframe-occlusion" src="./inner.html?detectOcclusion=true"></iframe>
+          <div class="overlay-container-old" id="overlay-container-occlusion"></div>
+        </div>
+        <div class="stats-panel">
+          <div class="stats-grid">
+            <div class="stat-item">
+              <span class="stat-label">avg</span>
+              <span class="stat-value" id="stat-occlusion-avg">--</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">p50</span>
+              <span class="stat-value" id="stat-occlusion-p50">--</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">p95</span>
+              <span class="stat-value" id="stat-occlusion-p95">--</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">max</span>
+              <span class="stat-value" id="stat-occlusion-max">--</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script type="module" src="./benchmark.ts"></script>
   </body>
 </html>

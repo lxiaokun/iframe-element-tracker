@@ -265,6 +265,89 @@
       <div id="element-4" class="tracked-element">Element 4</div>
       <div id="element-5" class="tracked-element">Element 5</div>
 
+      <!-- Overflow clipping demo -->
+      <p class="info" style="margin-top: 30px; margin-bottom: 10px">Overflow Clipping Demo</p>
+
+      <!-- Clipped on all 4 sides -->
+      <div
+        style="
+          width: 200px;
+          height: 80px;
+          overflow: hidden;
+          border: 2px dashed #999;
+          position: relative;
+          margin-bottom: 20px;
+        "
+      >
+        <div
+          id="element-overflow"
+          class="tracked-element"
+          style="
+            background: #1abc9c;
+            width: 250px;
+            height: 120px;
+            border-radius: 8px;
+            position: relative;
+            top: -20px;
+            left: -25px;
+          "
+        >
+          Overflow Clipped
+        </div>
+      </div>
+
+      <!-- Clipped only on X axis -->
+      <div
+        style="
+          width: 180px;
+          height: 60px;
+          overflow-x: hidden;
+          overflow-y: visible;
+          border: 2px dashed #999;
+          margin-bottom: 20px;
+        "
+      >
+        <div
+          id="element-overflow-x"
+          class="tracked-element"
+          style="background: #e84393; width: 250px; height: 50px; border-radius: 8px"
+        >
+          X-axis Clipped
+        </div>
+      </div>
+
+      <!-- Z-index occlusion demo -->
+      <p class="info" style="margin-top: 20px; margin-bottom: 10px">Z-index Occlusion Demo</p>
+      <div style="position: relative; margin-bottom: 20px">
+        <div
+          id="element-occluded"
+          class="tracked-element"
+          style="background: #6c5ce7; width: 200px; height: 100px; border-radius: 8px"
+        >
+          Partially Occluded
+        </div>
+        <div
+          style="
+            position: absolute;
+            top: 20px;
+            left: 80px;
+            width: 160px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.85);
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #333;
+            z-index: 10;
+          "
+        >
+          Occluding Element
+        </div>
+      </div>
+
       <!-- 底部区域 -->
       <div class="bottom-section">
         <p class="info">Scroll down to see this element</p>

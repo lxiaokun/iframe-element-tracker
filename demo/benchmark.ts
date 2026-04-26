@@ -1,6 +1,7 @@
 import { ElementReceiver } from '../src/receiver';
 import { OverlayPositioner } from '../src/overlay-positioner';
 import type { ElementRect, Bounds, ContainerScroll } from '../src/shared';
+import { MESSAGE_TYPE } from '../src/shared';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -37,6 +38,8 @@ const btnStart = document.getElementById('btn-start')!;
 const btnReset = document.getElementById('btn-reset')!;
 const sampleCountEl = document.getElementById('sample-count')!;
 const speedupBadge = document.getElementById('speedup-badge')!;
+const occSampleCountEl = document.getElementById('occ-sample-count')!;
+const occOverheadBadge = document.getElementById('occ-overhead-badge')!;
 
 // Old method side
 const oldSide: Side = {
@@ -59,6 +62,32 @@ const newSide: Side = {
   positioner: null,
   overlayContainer: document.getElementById('overlay-container-new')!,
   overlayClip: document.getElementById('overlay-clip-new'),
+  overlays: new Map(),
+  samples: [],
+  lastContainerScroll: undefined,
+};
+
+// Occlusion benchmark: Baseline side (no occlusion detection)
+const baselineSide: Side = {
+  label: 'baseline',
+  iframe: document.getElementById('iframe-baseline') as HTMLIFrameElement,
+  receiver: null,
+  positioner: null,
+  overlayContainer: document.getElementById('overlay-container-baseline')!,
+  overlayClip: null,
+  overlays: new Map(),
+  samples: [],
+  lastContainerScroll: undefined,
+};
+
+// Occlusion benchmark: With occlusion detection side
+const occlusionSide: Side = {
+  label: 'occlusion',
+  iframe: document.getElementById('iframe-occlusion') as HTMLIFrameElement,
+  receiver: null,
+  positioner: null,
+  overlayContainer: document.getElementById('overlay-container-occlusion')!,
+  overlayClip: null,
   overlays: new Map(),
   samples: [],
   lastContainerScroll: undefined,
@@ -172,9 +201,27 @@ function handleUpdateNew(elements: ElementRect[]) {
 
     if (newSide.positioner) {
       if (containerScroll) {
+        const docBounds = toDocumentBounds(el.bounds, containerScroll);
+        const docVisibleBounds = el.visibility.visibleBounds
+          ? toDocumentBounds(el.visibility.visibleBounds, containerScroll)
+          : null;
+        const docClipBounds = el.occlusion?.clipBounds
+          ? toDocumentBounds(el.occlusion.clipBounds, containerScroll)
+          : (el.occlusion?.clipBounds ?? undefined);
+        const docOccluders = el.occlusion?.occluders.map((occ) => ({
+          ...occ,
+          bounds: toDocumentBounds(occ.bounds, containerScroll),
+        }));
         const docRect = {
           ...el,
-          bounds: toDocumentBounds(el.bounds, containerScroll),
+          bounds: docBounds,
+          visibility: {
+            ...el.visibility,
+            visibleBounds: docVisibleBounds,
+          },
+          occlusion: el.occlusion
+            ? { clipBounds: docClipBounds ?? null, occluders: docOccluders ?? [] }
+            : undefined,
         };
         newSide.positioner.applyOverlayStyle(overlay, docRect);
       } else {
@@ -186,6 +233,74 @@ function handleUpdateNew(elements: ElementRect[]) {
   const elapsed = performance.now() - t0;
   if (benchRunning) {
     newSide.samples.push(elapsed);
+  }
+}
+
+// ─── Occlusion Benchmark: tracker-side timing via postMessage ───────────────
+
+// Track last update durations for occlusion benchmark
+let lastBaselineDuration = 0;
+let lastOcclusionDuration = 0;
+
+window.addEventListener('message', (event) => {
+  if (event.data?.type === MESSAGE_TYPE && event.data.updateDuration !== undefined) {
+    if (event.source === baselineSide.iframe.contentWindow) {
+      lastBaselineDuration = event.data.updateDuration;
+    } else if (event.source === occlusionSide.iframe.contentWindow) {
+      lastOcclusionDuration = event.data.updateDuration;
+    }
+  }
+});
+
+function handleUpdateBaseline(elements: ElementRect[]) {
+  elements.forEach((el) => {
+    let overlay = baselineSide.overlays.get(el.id);
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.className = 'bench-overlay';
+      overlay.dataset.overlayId = el.id;
+      baselineSide.overlayContainer.appendChild(overlay);
+      baselineSide.overlays.set(el.id, overlay);
+    }
+    if (!el.visibility.isVisible) {
+      overlay.style.display = 'none';
+      return;
+    }
+    overlay.style.display = 'block';
+    if (baselineSide.positioner) {
+      baselineSide.positioner.applyOverlayStyle(overlay, el);
+    }
+  });
+
+  // Record tracker-side duration from message
+  if (benchRunning && lastBaselineDuration > 0) {
+    baselineSide.samples.push(lastBaselineDuration);
+  }
+}
+
+function handleUpdateOcclusion(elements: ElementRect[]) {
+  elements.forEach((el) => {
+    let overlay = occlusionSide.overlays.get(el.id);
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.className = 'bench-overlay';
+      overlay.dataset.overlayId = el.id;
+      occlusionSide.overlayContainer.appendChild(overlay);
+      occlusionSide.overlays.set(el.id, overlay);
+    }
+    if (!el.visibility.isVisible) {
+      overlay.style.display = 'none';
+      return;
+    }
+    overlay.style.display = 'block';
+    if (occlusionSide.positioner) {
+      occlusionSide.positioner.applyOverlayStyle(overlay, el);
+    }
+  });
+
+  // Record tracker-side duration from message
+  if (benchRunning && lastOcclusionDuration > 0) {
+    occlusionSide.samples.push(lastOcclusionDuration);
   }
 }
 
@@ -220,6 +335,8 @@ function initSide(side: Side, handler: (elements: ElementRect[]) => void) {
 
 let oldLoaded = false;
 let newLoaded = false;
+let baselineLoaded = false;
+let occlusionLoaded = false;
 
 oldSide.iframe.addEventListener('load', () => {
   console.log('[Benchmark] Old iframe loaded');
@@ -233,6 +350,18 @@ newSide.iframe.addEventListener('load', () => {
   newLoaded = true;
 });
 
+baselineSide.iframe.addEventListener('load', () => {
+  console.log('[Benchmark] Baseline iframe loaded');
+  initSide(baselineSide, handleUpdateBaseline);
+  baselineLoaded = true;
+});
+
+occlusionSide.iframe.addEventListener('load', () => {
+  console.log('[Benchmark] Occlusion iframe loaded');
+  initSide(occlusionSide, handleUpdateOcclusion);
+  occlusionLoaded = true;
+});
+
 // ─── Auto-scroll ─────────────────────────────────────────────────────────────
 
 function scrollStep() {
@@ -241,7 +370,7 @@ function scrollStep() {
   const scrollAmount = 3; // pixels per frame
 
   // Scroll both iframes simultaneously
-  [oldSide, newSide].forEach((side) => {
+  [oldSide, newSide, baselineSide, occlusionSide].forEach((side) => {
     const win = side.iframe.contentWindow;
     if (!win) return;
 
@@ -310,12 +439,41 @@ function updateStatsDisplay() {
   } else {
     speedupBadge.textContent = 'Speedup: --';
   }
+
+  // Occlusion benchmark stats
+  const baselineStats = computeStats(baselineSide.samples);
+  const occlusionStats = computeStats(occlusionSide.samples);
+
+  const occTotalSamples = (baselineStats?.count ?? 0) + (occlusionStats?.count ?? 0);
+  occSampleCountEl.textContent = String(occTotalSamples);
+
+  if (baselineStats) {
+    document.getElementById('stat-baseline-avg')!.textContent = formatMs(baselineStats.avg);
+    document.getElementById('stat-baseline-p50')!.textContent = formatMs(baselineStats.p50);
+    document.getElementById('stat-baseline-p95')!.textContent = formatMs(baselineStats.p95);
+    document.getElementById('stat-baseline-max')!.textContent = formatMs(baselineStats.max);
+  }
+
+  if (occlusionStats) {
+    document.getElementById('stat-occlusion-avg')!.textContent = formatMs(occlusionStats.avg);
+    document.getElementById('stat-occlusion-p50')!.textContent = formatMs(occlusionStats.p50);
+    document.getElementById('stat-occlusion-p95')!.textContent = formatMs(occlusionStats.p95);
+    document.getElementById('stat-occlusion-max')!.textContent = formatMs(occlusionStats.max);
+  }
+
+  if (baselineStats && occlusionStats) {
+    const overhead = occlusionStats.avg - baselineStats.avg;
+    const pct = baselineStats.avg > 0 ? (overhead / baselineStats.avg) * 100 : 0;
+    occOverheadBadge.textContent = `Overhead: +${formatMs(overhead)} (+${pct.toFixed(0)}%)`;
+  } else {
+    occOverheadBadge.textContent = 'Overhead: --';
+  }
 }
 
 // ─── Controls ────────────────────────────────────────────────────────────────
 
 btnStart.addEventListener('click', () => {
-  if (!oldLoaded || !newLoaded) {
+  if (!oldLoaded || !newLoaded || !baselineLoaded || !occlusionLoaded) {
     console.warn('[Benchmark] Iframes not loaded yet');
     return;
   }
@@ -372,12 +530,22 @@ btnReset.addEventListener('click', () => {
   // Clear samples
   oldSide.samples = [];
   newSide.samples = [];
+  baselineSide.samples = [];
+  occlusionSide.samples = [];
 
   // Reset display
   sampleCountEl.textContent = '0';
   speedupBadge.textContent = 'Speedup: --';
+  occSampleCountEl.textContent = '0';
+  occOverheadBadge.textContent = 'Overhead: --';
 
   ['old', 'new'].forEach((side) => {
+    ['avg', 'p50', 'p95', 'max'].forEach((stat) => {
+      document.getElementById(`stat-${side}-${stat}`)!.textContent = '--';
+    });
+  });
+
+  ['baseline', 'occlusion'].forEach((side) => {
     ['avg', 'p50', 'p95', 'max'].forEach((stat) => {
       document.getElementById(`stat-${side}-${stat}`)!.textContent = '--';
     });

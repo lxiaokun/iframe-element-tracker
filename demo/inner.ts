@@ -5,8 +5,14 @@ import type { ElementRect } from '../src/shared';
 // Overlay rendering mode
 type OverlayMode = 'off' | 'passthrough' | 'interactive' | 'labeled' | 'rich';
 
+// Check URL params for benchmark configuration
+const urlParams = new URLSearchParams(window.location.search);
+const enableOcclusion = urlParams.get('detectOcclusion') === 'true';
+
 // Create ElementTracker instance (postMessage to host)
-const tracker = new ElementTracker();
+const tracker = new ElementTracker({
+  detectOcclusion: enableOcclusion,
+});
 
 // Elements to track
 const elementsToTrack = [
@@ -18,11 +24,15 @@ const elementsToTrack = [
   { id: 'element-4', label: 'Purple Rotated' },
   { id: 'element-5', label: 'Orange Fancy' },
   { id: 'element-bottom', label: 'Bottom Element' },
+  { id: 'element-overflow', label: 'Overflow Clipped' },
+  { id: 'element-overflow-x', label: 'X-axis Clipped' },
+  { id: 'element-occluded', label: 'Partially Occluded', detectOcclusion: true },
 ];
 
 // ==================== Same-page overlay ====================
 
 let localOverlayMode: OverlayMode = 'off';
+let innerClipEnabled = true;
 let localReceiver: ElementReceiver | null = null;
 let unsubscribeListener: (() => void) | null = null;
 const overlayElements: Map<string, HTMLElement> = new Map();
@@ -52,6 +62,59 @@ function updateLocalOverlay(elementRect: ElementRect) {
     return;
   }
   updateLocalOverlayStyle(overlay, elementRect);
+}
+
+/**
+ * Compute clip-path for inner overlay (1:1 scale, no iframe transform).
+ */
+function computeLocalClipPath(elementRect: ElementRect): string {
+  const { bounds, visibility } = elementRect;
+  const vb = visibility.visibleBounds;
+  const occlusion = elementRect.occlusion;
+  const MARGIN = 100;
+  const EPS = 0.01;
+
+  if (visibility.isFullyVisible && (!occlusion || occlusion.occluders.length === 0)) {
+    return '';
+  }
+  if (!vb) return '';
+
+  const insetTop = vb.y - bounds.y;
+  const insetRight = bounds.x + bounds.width - (vb.x + vb.width);
+  const insetBottom = bounds.y + bounds.height - (vb.y + vb.height);
+  const insetLeft = vb.x - bounds.x;
+
+  const hasOccluders = occlusion && occlusion.occluders.length > 0;
+
+  if (hasOccluders) {
+    const w = bounds.width;
+    const h = bounds.height;
+    const oT = insetTop > EPS ? insetTop : -MARGIN;
+    const oR = insetRight > EPS ? w - insetRight : w + MARGIN;
+    const oB = insetBottom > EPS ? h - insetBottom : h + MARGIN;
+    const oL = insetLeft > EPS ? insetLeft : -MARGIN;
+
+    let path = `M ${oL} ${oT} L ${oR} ${oT} L ${oR} ${oB} L ${oL} ${oB} Z`;
+    for (const occ of occlusion!.occluders) {
+      const ol = occ.bounds.x - bounds.x;
+      const ot = occ.bounds.y - bounds.y;
+      const or2 = ol + occ.bounds.width;
+      const ob = ot + occ.bounds.height;
+      path += ` M ${ol} ${ot} L ${ol} ${ob} L ${or2} ${ob} L ${or2} ${ot} Z`;
+    }
+    return `path(evenodd, "${path}")`;
+  }
+
+  if (insetTop <= EPS && insetRight <= EPS && insetBottom <= EPS && insetLeft <= EPS) {
+    return '';
+  }
+
+  const top = insetTop > EPS ? `${insetTop}px` : `${-MARGIN}px`;
+  const right = insetRight > EPS ? `${insetRight}px` : `${-MARGIN}px`;
+  const bottom = insetBottom > EPS ? `${insetBottom}px` : `${-MARGIN}px`;
+  const left = insetLeft > EPS ? `${insetLeft}px` : `${-MARGIN}px`;
+
+  return `inset(${top} ${right} ${bottom} ${left})`;
 }
 
 /**
@@ -85,6 +148,9 @@ function updateLocalOverlayStyle(overlay: HTMLElement, elementRect: ElementRect)
   } else {
     overlay.style.transform = '';
   }
+
+  // Apply clip-path for overflow/occlusion clipping (inner overlay uses 1:1 scale)
+  overlay.style.clipPath = innerClipEnabled ? computeLocalClipPath(elementRect) : '';
 
   // Apply mode-specific styling
   applyLocalOverlayMode(overlay, elementRect, metadata?.label);
@@ -343,6 +409,13 @@ window.addEventListener('message', (event) => {
     if (event.data.action === 'setMode') {
       setLocalOverlayMode(event.data.mode);
     }
+    if (event.data.action === 'setClip') {
+      innerClipEnabled = event.data.enabled;
+      // Re-render all overlays to apply/clear clip-path
+      localReceiver?.getElements().forEach((el) => {
+        updateLocalOverlay(el);
+      });
+    }
   }
   if (event.data?.type === 'ELEMENT_STYLE_CONTROL') {
     if (event.data.action === 'applyStyles') {
@@ -355,11 +428,12 @@ window.addEventListener('message', (event) => {
 
 // Register elements after DOM is fully loaded
 document.addEventListener('DOMContentLoaded', () => {
-  elementsToTrack.forEach(({ id, label }) => {
+  elementsToTrack.forEach(({ id, label, detectOcclusion }) => {
     const element = document.getElementById(id);
     if (element) {
       tracker.register(element, id, {
         metadata: { label },
+        detectOcclusion,
       });
     }
   });
