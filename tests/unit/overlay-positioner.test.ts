@@ -419,6 +419,173 @@ describe('OverlayPositioner', () => {
     });
   });
 
+  // ==================== clip-path computation ====================
+
+  describe('clip-path computation', () => {
+    beforeEach(() => {
+      vi.spyOn(positioner, 'getScaleContext').mockReturnValue(createScaleContext());
+    });
+
+    it('returns null clipPath when element is fully visible', () => {
+      const rect = createElementRect({
+        visibility: {
+          isVisible: true,
+          isFullyVisible: true,
+          visibleBounds: { x: 100, y: 50, width: 200, height: 100 },
+        },
+      });
+      const style = positioner.getOverlayStyle(rect);
+      expect(style).not.toBeNull();
+      expect(style!.clipPath).toBeNull();
+    });
+
+    it('returns null clipPath when all insets are zero', () => {
+      const rect = createElementRect({
+        bounds: { x: 100, y: 50, width: 200, height: 100 },
+        visibility: {
+          isVisible: true,
+          isFullyVisible: false,
+          visibleBounds: { x: 100, y: 50, width: 200, height: 100 },
+          hiddenReason: 'clipped',
+        },
+      });
+      const style = positioner.getOverlayStyle(rect);
+      expect(style!.clipPath).toBeNull();
+    });
+
+    it('computes inset clip-path for right-side clipping', () => {
+      const rect = createElementRect({
+        bounds: { x: 100, y: 50, width: 200, height: 100 },
+        visibility: {
+          isVisible: true,
+          isFullyVisible: false,
+          visibleBounds: { x: 100, y: 50, width: 150, height: 100 },
+          hiddenReason: 'clipped',
+        },
+      });
+      const style = positioner.getOverlayStyle(rect);
+      // insetTop=0, insetRight=50, insetBottom=0, insetLeft=0
+      // With identity scale: right=50px, others=-100px
+      expect(style!.clipPath).toBe('inset(-100px 50px -100px -100px)');
+    });
+
+    it('computes inset clip-path for all-side clipping', () => {
+      const rect = createElementRect({
+        bounds: { x: 100, y: 50, width: 200, height: 100 },
+        visibility: {
+          isVisible: true,
+          isFullyVisible: false,
+          visibleBounds: { x: 120, y: 60, width: 160, height: 80 },
+          hiddenReason: 'clipped',
+        },
+      });
+      const style = positioner.getOverlayStyle(rect);
+      // insetTop=10, insetRight=20, insetBottom=10, insetLeft=20
+      expect(style!.clipPath).toBe('inset(10px 20px 10px 20px)');
+    });
+
+    it('scales insets with iframeScale (combinedScale / ancestorScale)', () => {
+      vi.spyOn(positioner, 'getScaleContext').mockReturnValue(
+        createScaleContext({
+          combinedScale: { scaleX: 0.5, scaleY: 0.5 },
+          ancestorScale: { scaleX: 1, scaleY: 1 },
+        }),
+      );
+
+      const rect = createElementRect({
+        bounds: { x: 100, y: 50, width: 200, height: 100 },
+        visibility: {
+          isVisible: true,
+          isFullyVisible: false,
+          visibleBounds: { x: 120, y: 60, width: 160, height: 80 },
+          hiddenReason: 'clipped',
+        },
+      });
+      const style = positioner.getOverlayStyle(rect);
+      // insetTop=10*0.5=5, insetRight=20*0.5=10, insetBottom=10*0.5=5, insetLeft=20*0.5=10
+      expect(style!.clipPath).toBe('inset(5px 10px 5px 10px)');
+    });
+
+    it('uses custom clipOverflowMargin', () => {
+      const customPositioner = new OverlayPositioner({
+        iframe,
+        container,
+        clipOverflowMargin: 50,
+      });
+      vi.spyOn(customPositioner, 'getScaleContext').mockReturnValue(createScaleContext());
+
+      const rect = createElementRect({
+        bounds: { x: 100, y: 50, width: 200, height: 100 },
+        visibility: {
+          isVisible: true,
+          isFullyVisible: false,
+          visibleBounds: { x: 100, y: 50, width: 150, height: 100 },
+          hiddenReason: 'clipped',
+        },
+      });
+      const style = customPositioner.getOverlayStyle(rect);
+      expect(style!.clipPath).toBe('inset(-50px 50px -50px -50px)');
+    });
+
+    it('generates path evenodd clip-path when occluders present', () => {
+      const rect = createElementRect({
+        bounds: { x: 100, y: 50, width: 200, height: 100 },
+        visibility: {
+          isVisible: true,
+          isFullyVisible: true,
+          visibleBounds: { x: 100, y: 50, width: 200, height: 100 },
+        },
+        occlusion: {
+          clipBounds: null,
+          occluders: [
+            {
+              elementTag: 'div',
+              elementId: 'occ1',
+              bounds: { x: 150, y: 70, width: 80, height: 40 },
+            },
+          ],
+        },
+      });
+      const style = positioner.getOverlayStyle(rect);
+      expect(style!.clipPath).not.toBeNull();
+      expect(style!.clipPath).toContain('path(evenodd');
+      // Outer rect should use -100 margin, occluder should be a hole
+      expect(style!.clipPath).toContain('M -100 -100');
+    });
+
+    it('applies clip-path to overlay via applyOverlayStyle', () => {
+      const overlay = document.createElement('div');
+      const rect = createElementRect({
+        bounds: { x: 100, y: 50, width: 200, height: 100 },
+        visibility: {
+          isVisible: true,
+          isFullyVisible: false,
+          visibleBounds: { x: 120, y: 60, width: 160, height: 80 },
+          hiddenReason: 'clipped',
+        },
+      });
+
+      positioner.applyOverlayStyle(overlay, rect);
+      expect(overlay.style.clipPath).toBe('inset(10px 20px 10px 20px)');
+    });
+
+    it('clears clip-path when element becomes fully visible', () => {
+      const overlay = document.createElement('div');
+      overlay.style.clipPath = 'inset(10px 20px 10px 20px)';
+
+      const rect = createElementRect({
+        visibility: {
+          isVisible: true,
+          isFullyVisible: true,
+          visibleBounds: { x: 100, y: 50, width: 200, height: 100 },
+        },
+      });
+
+      positioner.applyOverlayStyle(overlay, rect);
+      expect(overlay.style.clipPath).toBe('');
+    });
+  });
+
   // ==================== utility methods ====================
 
   describe('utility methods', () => {

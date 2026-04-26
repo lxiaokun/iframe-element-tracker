@@ -10,6 +10,8 @@ export type {
   Spacing,
   Bounds,
   ElementVisibility,
+  OccluderRect,
+  OcclusionInfo,
   ElementStyles,
   ElementScroll,
   ElementAttributes,

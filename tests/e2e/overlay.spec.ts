@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 const DEMO_URL = '/demo/host.html';
-const TRACKED_ELEMENT_COUNT = 8;
+const TRACKED_ELEMENT_COUNT = 11;
 const ALIGNMENT_TOLERANCE = 1; // 1px tolerance for subpixel rounding
 
 test.describe('Overlay E2E', () => {
@@ -206,6 +206,195 @@ test.describe('Overlay E2E', () => {
       Math.abs(newVisualTop - initialVisualTop),
       `Expected overlay visual top to change after scroll. Initial: ${initialVisualTop}, After: ${newVisualTop}`,
     ).toBeGreaterThan(10);
+  });
+
+  test('overflow:hidden overlay is clipped to container bounds', async ({ page }) => {
+    // Scroll to the overflow element
+    const iframePage = page.frameLocator('#inner-frame');
+    await iframePage.locator('#element-overflow').scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+    await waitForOverlayUpdate(page);
+
+    const result = await page.evaluate(() => {
+      const iframe = document.getElementById('inner-frame') as HTMLIFrameElement;
+      const iframeRect = iframe.getBoundingClientRect();
+      const iframeDoc = iframe.contentDocument;
+      if (!iframeDoc) return null;
+
+      // The overflow container is the parent of element-overflow
+      const element = iframeDoc.getElementById('element-overflow');
+      if (!element) return null;
+      const container = element.parentElement;
+      if (!container) return null;
+      const containerRect = container.getBoundingClientRect();
+
+      // Get the overlay's visual bounding box (after clip-path is applied)
+      const overlay = document.querySelector('[data-overlay-id="element-overflow"]') as HTMLElement;
+      if (!overlay) return null;
+      const overlayRect = overlay.getBoundingClientRect();
+      const clipPath = overlay.style.clipPath;
+
+      // Container position in host viewport (accounting for iframe position + border)
+      const containerInHost = {
+        left: iframeRect.left + iframe.clientLeft + containerRect.left,
+        top: iframeRect.top + iframe.clientTop + containerRect.top,
+        width: containerRect.width,
+        height: containerRect.height,
+      };
+
+      return {
+        containerInHost,
+        overlayRect: {
+          left: overlayRect.left,
+          top: overlayRect.top,
+          width: overlayRect.width,
+          height: overlayRect.height,
+        },
+        clipPath: clipPath || '',
+        // The element is 250x120 but container is 200x80
+        elementFullWidth: 250,
+        elementFullHeight: 120,
+      };
+    });
+
+    expect(result).not.toBeNull();
+    if (!result) return;
+
+    // Must have clip-path
+    expect(result.clipPath).toContain('inset(');
+
+    // Key check: the overlay element itself is full-size (250x120),
+    // but after clip-path, its visual extent should match the container (200x80).
+    // We can't directly get the clipped bounding rect, so instead verify:
+    // 1. The clip-path has reasonable inset values (all less than element dimensions)
+    const match = result.clipPath.match(/inset\(([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+)\)/);
+    expect(match).not.toBeNull();
+    if (match) {
+      const top = parseFloat(match[1]);
+      const right = parseFloat(match[2]);
+      const bottom = parseFloat(match[3]);
+      const left = parseFloat(match[4]);
+
+      // All positive insets must be less than the element's dimensions
+      // This catches the bug where bottom was 600px on a 120px element
+      if (top > 0) expect(top).toBeLessThan(result.elementFullHeight);
+      if (bottom > 0) expect(bottom).toBeLessThan(result.elementFullHeight);
+      if (left > 0) expect(left).toBeLessThan(result.elementFullWidth);
+      if (right > 0) expect(right).toBeLessThan(result.elementFullWidth);
+
+      // Sum of vertical insets should roughly equal height difference (120-80=40)
+      const verticalClip = Math.max(0, top) + Math.max(0, bottom);
+      expect(verticalClip).toBeGreaterThan(30); // some clipping expected
+      expect(verticalClip).toBeLessThan(result.elementFullHeight); // not all clipped
+
+      // Sum of horizontal insets should roughly equal width difference (250-200=50)
+      const horizontalClip = Math.max(0, left) + Math.max(0, right);
+      expect(horizontalClip).toBeGreaterThan(40);
+      expect(horizontalClip).toBeLessThan(result.elementFullWidth);
+    }
+  });
+
+  test('overlay for fully visible element has no clip-path', async ({ page }) => {
+    const clipPath = await page.evaluate(() => {
+      const overlay = document.querySelector('[data-overlay-id="element-1"]') as HTMLElement;
+      return overlay?.style.clipPath || '';
+    });
+
+    expect(clipPath).toBe('');
+  });
+
+  test('overflow-x overlay clips horizontally but not vertically', async ({ page }) => {
+    const iframePage = page.frameLocator('#inner-frame');
+    await iframePage.locator('#element-overflow-x').scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+    await waitForOverlayUpdate(page);
+
+    const clipPath = await page.evaluate(() => {
+      const overlay = document.querySelector(
+        '[data-overlay-id="element-overflow-x"]',
+      ) as HTMLElement;
+      return overlay?.style.clipPath || '';
+    });
+
+    expect(clipPath).toContain('inset(');
+    const match = clipPath.match(/inset\(([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+)\)/);
+    expect(match).not.toBeNull();
+    if (match) {
+      const top = parseFloat(match[1]);
+      const right = parseFloat(match[2]);
+      const _bottom = parseFloat(match[3]);
+      const _left = parseFloat(match[4]);
+
+      // Vertical sides: should be negative (unclipped by overflow-y:visible)
+      // Note: bottom may be positive due to iframe viewport clipping, which is fine.
+      // But top should definitely be unclipped (element starts inside the container vertically).
+      expect(top).toBeLessThan(0);
+
+      // Horizontal: right side must be clipped (element is 250px in 180px container)
+      expect(right).toBeGreaterThan(0);
+      // Right clip should be roughly 70px (250-180), allow tolerance
+      expect(right).toBeGreaterThan(50);
+      expect(right).toBeLessThan(100);
+
+      // Ensure the other values are numbers (not NaN)
+      expect(_bottom).not.toBeNaN();
+      expect(_left).not.toBeNaN();
+    }
+  });
+
+  test('occluded element has evenodd path clip-path', async ({ page }) => {
+    const iframePage = page.frameLocator('#inner-frame');
+    await iframePage.locator('#element-occluded').scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+    await waitForOverlayUpdate(page);
+
+    const clipPath = await page.evaluate(() => {
+      const overlay = document.querySelector('[data-overlay-id="element-occluded"]') as HTMLElement;
+      return overlay?.style.clipPath || '';
+    });
+
+    expect(clipPath).toContain('path(evenodd');
+    // Should contain at least 2 Z commands (outer rect + at least one hole)
+    const zCount = (clipPath.match(/Z/g) || []).length;
+    expect(zCount).toBeGreaterThanOrEqual(2);
+  });
+
+  test('overflow clip-path insets scale correctly with iframe transform', async ({ page }) => {
+    const iframePage = page.frameLocator('#inner-frame');
+    await iframePage.locator('#element-overflow').scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+    await waitForOverlayUpdate(page);
+
+    // Get baseline insets
+    const baselineClip = await page.evaluate(() => {
+      const overlay = document.querySelector('[data-overlay-id="element-overflow"]') as HTMLElement;
+      return overlay?.style.clipPath || '';
+    });
+    const baselineMatch = baselineClip.match(/inset\(([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+)\)/);
+
+    // Apply scale(0.8) to iframe
+    await page.click('#test-transform');
+    await waitForOverlayUpdate(page);
+
+    const scaledClip = await page.evaluate(() => {
+      const overlay = document.querySelector('[data-overlay-id="element-overflow"]') as HTMLElement;
+      return overlay?.style.clipPath || '';
+    });
+
+    expect(scaledClip).toContain('inset(');
+    const scaledMatch = scaledClip.match(/inset\(([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+)\)/);
+    expect(scaledMatch).not.toBeNull();
+
+    // Positive insets should be roughly 0.8x of baseline (since iframe scale is 0.8)
+    if (baselineMatch && scaledMatch) {
+      const baseRight = parseFloat(baselineMatch[2]);
+      const scaledRight = parseFloat(scaledMatch[2]);
+      if (baseRight > 0 && scaledRight > 0) {
+        const ratio = scaledRight / baseRight;
+        expect(ratio).toBeGreaterThan(0.6);
+        expect(ratio).toBeLessThan(1.0);
+      }
+    }
   });
 });
 
@@ -595,6 +784,54 @@ test.describe('Inner Overlay E2E', () => {
         Math.abs(positions.element.height - positions.overlay.height),
         `${elementId} height: expected ${positions.element.height}, got ${positions.overlay.height}`,
       ).toBeLessThanOrEqual(ALIGNMENT_TOLERANCE);
+    }
+  });
+
+  test('inner overlay clips overflow elements when clip is enabled', async ({ page }) => {
+    // Enable inner overlay
+    await page.click('#inner-mode-passthrough');
+
+    const iframePage = page.frameLocator('#inner-frame');
+    await expect(iframePage.locator('#overlay-container > div')).toHaveCount(
+      TRACKED_ELEMENT_COUNT,
+      {
+        timeout: 5000,
+      },
+    );
+
+    await iframePage.locator('#element-overflow').scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+
+    // Force update
+    await iframePage.locator('body').evaluate(() => {
+      (window as any).tracker?.forceUpdate();
+    });
+    await page.waitForTimeout(200);
+
+    // Check inner overlay has clip-path
+    const clipPath = await iframePage.locator('body').evaluate(() => {
+      const overlay = document.querySelector('[data-overlay-id="element-overflow"]') as HTMLElement;
+      return overlay?.style.clipPath || '';
+    });
+
+    expect(clipPath).toContain('inset(');
+
+    // Verify inset values are reasonable (not hundreds of pixels)
+    const match = clipPath.match(/inset\(([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+)\)/);
+    expect(match).not.toBeNull();
+    if (match) {
+      const values = [
+        parseFloat(match[1]),
+        parseFloat(match[2]),
+        parseFloat(match[3]),
+        parseFloat(match[4]),
+      ];
+      // All positive insets should be less than 120px (element height) or 250px (element width)
+      values
+        .filter((v) => v > 0)
+        .forEach((v) => {
+          expect(v).toBeLessThan(250);
+        });
     }
   });
 });

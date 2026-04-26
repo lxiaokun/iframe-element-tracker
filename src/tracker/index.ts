@@ -6,8 +6,27 @@ import {
   Bounds,
   Spacing,
   TrackerMessage,
+  OcclusionInfo,
+  OccluderRect,
   MESSAGE_TYPE,
 } from '../shared';
+
+/**
+ * Compute the intersection of two Bounds rectangles.
+ * Returns a Bounds whose width/height may be 0 if they don't overlap.
+ */
+function intersectBounds(a: Bounds, b: Bounds): Bounds {
+  const x = Math.max(a.x, b.x);
+  const y = Math.max(a.y, b.y);
+  const right = Math.min(a.x + a.width, b.x + b.width);
+  const bottom = Math.min(a.y + a.height, b.y + b.height);
+  return {
+    x,
+    y,
+    width: Math.max(0, right - x),
+    height: Math.max(0, bottom - y),
+  };
+}
 
 /**
  * Callback type for additional message listeners
@@ -20,6 +39,8 @@ export type TrackerMessageListener = (message: TrackerMessage) => void;
 export interface RegisterOptions {
   /** User-defined custom data */
   metadata?: Record<string, unknown>;
+  /** Enable occlusion detection for this element (overrides global setting) */
+  detectOcclusion?: boolean;
 }
 
 /**
@@ -38,6 +59,8 @@ export interface TrackerOptions {
    * instead of window's, and binds scroll events to this element.
    */
   scrollContainer?: HTMLElement;
+  /** Enable z-index occlusion detection (uses elementFromPoint). Default false */
+  detectOcclusion?: boolean;
 }
 
 /**
@@ -47,6 +70,7 @@ interface TrackedElement {
   element: Element;
   id: string;
   metadata?: Record<string, unknown>;
+  detectOcclusion: boolean;
   lastRect: ElementRect | null;
 }
 
@@ -67,12 +91,15 @@ export class ElementTracker {
   private pendingUpdate: number | null = null;
   private isDestroyed = false;
   private scrollContainer: HTMLElement | null;
+  private detectOcclusion: boolean;
+  private lastUpdateDuration: number = 0;
 
   constructor(options: TrackerOptions = {}) {
     this.targetWindow = options.targetWindow ?? window.parent;
     this.targetOrigin = options.targetOrigin ?? '*';
     this.onMessage = options.onMessage ?? null;
     this.scrollContainer = options.scrollContainer ?? null;
+    this.detectOcclusion = options.detectOcclusion ?? false;
 
     // Create ResizeObserver to monitor element size changes
     this.resizeObserver = new ResizeObserver(() => {
@@ -123,6 +150,7 @@ export class ElementTracker {
       element,
       id,
       metadata: options.metadata,
+      detectOcclusion: options.detectOcclusion ?? this.detectOcclusion,
       lastRect: null,
     };
 
@@ -169,6 +197,13 @@ export class ElementTracker {
    */
   forceUpdate(): void {
     this.performUpdate();
+  }
+
+  /**
+   * Get the duration of the last performUpdate() call in milliseconds.
+   */
+  getLastUpdateDuration(): number {
+    return this.lastUpdateDuration;
   }
 
   /**
@@ -256,6 +291,8 @@ export class ElementTracker {
       return;
     }
 
+    const t0 = performance.now();
+
     const elements: ElementRect[] = [];
 
     for (const tracked of this.trackedElements.values()) {
@@ -264,7 +301,10 @@ export class ElementTracker {
       elements.push(rect);
     }
 
-    this.sendUpdate('update', elements);
+    const updateDuration = performance.now() - t0;
+    this.lastUpdateDuration = updateDuration;
+
+    this.sendUpdate('update', elements, updateDuration);
   }
 
   /**
@@ -345,6 +385,7 @@ export class ElementTracker {
     }
 
     const visibility = this.getVisibility(element, domRect);
+    const occlusion = this.getOcclusion(element, visibility, tracked.detectOcclusion);
     const styles = this.getStyles(computedStyle);
     const scroll = this.getScroll(element);
     const attributes = this.getAttributes(htmlElement);
@@ -358,6 +399,7 @@ export class ElementTracker {
       styles,
       scroll,
       metadata,
+      occlusion,
     };
   }
 
@@ -377,6 +419,125 @@ export class ElementTracker {
       elementId: element.id || '',
       classList: Array.from(element.classList),
       dataset,
+    };
+  }
+
+  /**
+   * Compute the clip rectangle from ancestor overflow clipping.
+   * Walks from element's parent up to the document element.
+   */
+  private getAncestorClipRect(element: Element): Bounds | null {
+    let clipRect: Bounds | null = null;
+    let current: Element | null = element.parentElement;
+
+    while (current && current !== document.documentElement) {
+      const style = getComputedStyle(current);
+      const clipsX = style.overflowX !== 'visible' && style.overflowX !== '';
+      const clipsY = style.overflowY !== 'visible' && style.overflowY !== '';
+
+      if (clipsX || clipsY) {
+        const rect = current.getBoundingClientRect();
+        const ancestorClip: Bounds = {
+          x: clipsX ? rect.x : -1e6,
+          y: clipsY ? rect.y : -1e6,
+          width: clipsX ? rect.width : 2e6,
+          height: clipsY ? rect.height : 2e6,
+        };
+
+        clipRect = clipRect === null ? ancestorClip : intersectBounds(clipRect, ancestorClip);
+
+        if (clipRect.width <= 0 || clipRect.height <= 0) {
+          return { x: clipRect.x, y: clipRect.y, width: 0, height: 0 };
+        }
+      }
+
+      current = current.parentElement;
+    }
+
+    return clipRect;
+  }
+
+  /**
+   * Get occlusion information for an element.
+   * Always computes ancestor overflow clip bounds.
+   * Only runs elementFromPoint detection when detectOcclusion is enabled.
+   */
+  private getOcclusion(
+    element: Element,
+    visibility: ElementVisibility,
+    detectOcclusion: boolean,
+  ): OcclusionInfo {
+    const clipBounds = this.getAncestorClipRect(element);
+
+    if (!detectOcclusion || !visibility.isVisible || !visibility.visibleBounds) {
+      return { clipBounds, occluders: [] };
+    }
+
+    const vb = visibility.visibleBounds;
+    const occluderMap = new Map<Element, OccluderRect>();
+
+    // Grid sampling with ~20px step, always include edges
+    const stepX = Math.min(20, vb.width / 2);
+    const stepY = Math.min(20, vb.height / 2);
+
+    // Generate sample points
+    const xPoints: number[] = [];
+    const yPoints: number[] = [];
+
+    for (let x = vb.x; x <= vb.x + vb.width; x += stepX) {
+      xPoints.push(x);
+    }
+    // Ensure right edge is included
+    if (xPoints[xPoints.length - 1] < vb.x + vb.width - 0.5) {
+      xPoints.push(vb.x + vb.width - 0.5);
+    }
+
+    for (let y = vb.y; y <= vb.y + vb.height; y += stepY) {
+      yPoints.push(y);
+    }
+    // Ensure bottom edge is included
+    if (yPoints[yPoints.length - 1] < vb.y + vb.height - 0.5) {
+      yPoints.push(vb.y + vb.height - 0.5);
+    }
+
+    for (const x of xPoints) {
+      for (const y of yPoints) {
+        // Offset slightly inward to avoid edge issues
+        const sampleX = Math.max(vb.x + 0.5, Math.min(x, vb.x + vb.width - 0.5));
+        const sampleY = Math.max(vb.y + 0.5, Math.min(y, vb.y + vb.height - 0.5));
+
+        const topEl = document.elementFromPoint(sampleX, sampleY);
+        if (!topEl) continue;
+
+        // Check if the hit element is the tracked element or one of its descendants
+        if (topEl === element || element.contains(topEl)) continue;
+
+        // Also skip if the tracked element contains the hit element (shouldn't happen with above check, but be safe)
+        if (topEl.contains(element)) continue;
+
+        // This element is an occluder
+        if (!occluderMap.has(topEl)) {
+          const occRect = topEl.getBoundingClientRect();
+          // Intersect occluder rect with the visible bounds to get the actual occlusion area
+          const occBounds = intersectBounds(
+            { x: occRect.x, y: occRect.y, width: occRect.width, height: occRect.height },
+            vb,
+          );
+
+          if (occBounds.width > 0 && occBounds.height > 0) {
+            occluderMap.set(topEl, {
+              elementTag: topEl.tagName.toLowerCase(),
+              elementId: (topEl as HTMLElement).id || '',
+              bounds: occBounds,
+            });
+          }
+        }
+      }
+    }
+
+    return {
+      clipBounds,
+      occluders: Array.from(occluderMap.values()),
     };
   }
 
@@ -415,20 +576,31 @@ export class ElementTracker {
       };
     }
 
-    // Calculate intersection with viewport
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
+    // Build element bounds and viewport bounds
+    const elementBounds: Bounds = {
+      x: domRect.x,
+      y: domRect.y,
+      width: domRect.width,
+      height: domRect.height,
+    };
+    const viewportBounds: Bounds = {
+      x: 0,
+      y: 0,
+      width: window.innerWidth,
+      height: window.innerHeight,
+    };
 
-    const visibleX = Math.max(0, domRect.x);
-    const visibleY = Math.max(0, domRect.y);
-    const visibleRight = Math.min(viewportWidth, domRect.x + domRect.width);
-    const visibleBottom = Math.min(viewportHeight, domRect.y + domRect.height);
+    // Element ∩ viewport
+    let clipped = intersectBounds(elementBounds, viewportBounds);
 
-    const visibleWidth = Math.max(0, visibleRight - visibleX);
-    const visibleHeight = Math.max(0, visibleBottom - visibleY);
+    // Intersect with ancestor overflow clip rect (if any)
+    const ancestorClip = this.getAncestorClipRect(element);
+    if (ancestorClip !== null) {
+      clipped = intersectBounds(clipped, ancestorClip);
+    }
 
-    // Completely outside viewport
-    if (visibleWidth === 0 || visibleHeight === 0) {
+    // Completely outside visible area
+    if (clipped.width === 0 || clipped.height === 0) {
       return {
         isVisible: false,
         isFullyVisible: false,
@@ -437,20 +609,22 @@ export class ElementTracker {
       };
     }
 
+    // Use epsilon for floating-point comparison
+    const EPS = 0.01;
     const isFullyVisible =
-      domRect.x >= 0 &&
-      domRect.y >= 0 &&
-      domRect.x + domRect.width <= viewportWidth &&
-      domRect.y + domRect.height <= viewportHeight;
+      Math.abs(clipped.x - elementBounds.x) < EPS &&
+      Math.abs(clipped.y - elementBounds.y) < EPS &&
+      Math.abs(clipped.width - elementBounds.width) < EPS &&
+      Math.abs(clipped.height - elementBounds.height) < EPS;
 
     return {
       isVisible: true,
       isFullyVisible,
       visibleBounds: {
-        x: visibleX,
-        y: visibleY,
-        width: visibleWidth,
-        height: visibleHeight,
+        x: clipped.x,
+        y: clipped.y,
+        width: clipped.width,
+        height: clipped.height,
       },
       hiddenReason: isFullyVisible ? undefined : 'clipped',
     };
@@ -549,12 +723,17 @@ export class ElementTracker {
   /**
    * Send update message to host page
    */
-  private sendUpdate(action: TrackerMessage['action'], elements: ElementRect[]): void {
+  private sendUpdate(
+    action: TrackerMessage['action'],
+    elements: ElementRect[],
+    updateDuration?: number,
+  ): void {
     const message: TrackerMessage = {
       type: MESSAGE_TYPE,
       action,
       elements,
       containerScroll: this.getContainerScroll(),
+      updateDuration,
     };
 
     // Primary dispatch
