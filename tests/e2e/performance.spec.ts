@@ -1,7 +1,10 @@
 import { test, expect } from '@playwright/test';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
 const BENCHMARK_URL = '/demo/benchmark.html';
 const BENCHMARK_DURATION_MS = 3000;
+const REPORT_DIR = process.env.PERF_REPORT_DIR ?? 'test-results/performance';
 
 interface BenchmarkStats {
   count: number;
@@ -24,6 +27,13 @@ interface BenchmarkSnapshot {
   new: BenchmarkSideSnapshot;
   baseline: BenchmarkSideSnapshot;
   occlusion: BenchmarkSideSnapshot;
+}
+
+interface MetricComparison {
+  label: string;
+  baseline: BenchmarkStats;
+  candidate: BenchmarkStats;
+  ratio?: number;
 }
 
 test.describe('Performance benchmarks', () => {
@@ -59,6 +69,15 @@ test.describe('Performance benchmarks', () => {
       newStats.p95,
       `scroll-sync p95 ${newStats.p95}ms should remain below one frame budget`,
     ).toBeLessThan(16);
+
+    await writePerformanceReport('scroll-sync-overlay', snapshot, [
+      {
+        label: 'Scroll-sync overlay vs full recalculation',
+        baseline: oldStats,
+        candidate: newStats,
+        ratio: oldStats.avg / newStats.avg,
+      },
+    ]);
   });
 
   test('tracker occlusion detection stays within publishable latency budget', async ({ page }) => {
@@ -84,6 +103,15 @@ test.describe('Performance benchmarks', () => {
       occlusionStats.avg,
       `occlusion tracker avg ${occlusionStats.avg}ms should leave room for host work`,
     ).toBeLessThan(20);
+
+    await writePerformanceReport('tracker-occlusion', snapshot, [
+      {
+        label: 'Tracker occlusion vs baseline',
+        baseline: baselineStats,
+        candidate: occlusionStats,
+        ratio: occlusionStats.avg / baselineStats.avg,
+      },
+    ]);
   });
 });
 
@@ -107,4 +135,84 @@ function expectUsableStats(
   expect(stats.p95, `${label} p95 should be no larger than max`).toBeLessThanOrEqual(stats.max);
 
   return stats;
+}
+
+async function writePerformanceReport(
+  name: string,
+  snapshot: BenchmarkSnapshot,
+  comparisons: MetricComparison[],
+): Promise<void> {
+  await mkdir(REPORT_DIR, { recursive: true });
+
+  const report = {
+    name,
+    generatedAt: new Date().toISOString(),
+    durationMs: BENCHMARK_DURATION_MS,
+    snapshot,
+    comparisons,
+  };
+
+  await writeFile(join(REPORT_DIR, `${name}.json`), `${JSON.stringify(report, null, 2)}\n`);
+  await writeFile(join(REPORT_DIR, `${name}.md`), renderMarkdownReport(report));
+}
+
+function renderMarkdownReport(report: {
+  name: string;
+  generatedAt: string;
+  durationMs: number;
+  snapshot: BenchmarkSnapshot;
+  comparisons: MetricComparison[];
+}): string {
+  const lines = [
+    `# ${report.name} Performance Report`,
+    '',
+    `Generated: ${report.generatedAt}`,
+    `Duration: ${report.durationMs}ms`,
+    '',
+    '## Summary',
+    '',
+    '| Metric | Baseline Avg | Candidate Avg | Ratio | Candidate P95 |',
+    '| --- | ---: | ---: | ---: | ---: |',
+    ...report.comparisons.map((comparison) =>
+      [
+        `| ${comparison.label}`,
+        formatMs(comparison.baseline.avg),
+        formatMs(comparison.candidate.avg),
+        comparison.ratio === undefined ? '--' : `${comparison.ratio.toFixed(2)}x`,
+        `${formatMs(comparison.candidate.p95)} |`,
+      ].join(' | '),
+    ),
+    '',
+    '## Raw Stats',
+    '',
+    '| Side | Samples | Avg | P50 | P95 | Max |',
+    '| --- | ---: | ---: | ---: | ---: | ---: |',
+    renderSideRow(report.snapshot.old),
+    renderSideRow(report.snapshot.new),
+    renderSideRow(report.snapshot.baseline),
+    renderSideRow(report.snapshot.occlusion),
+    '',
+  ];
+
+  return `${lines.join('\n')}\n`;
+}
+
+function renderSideRow(side: BenchmarkSideSnapshot): string {
+  const stats = side.stats;
+  if (!stats) {
+    return `| ${side.label} | ${side.sampleCount} | -- | -- | -- | -- |`;
+  }
+
+  return [
+    `| ${side.label}`,
+    String(side.sampleCount),
+    formatMs(stats.avg),
+    formatMs(stats.p50),
+    formatMs(stats.p95),
+    `${formatMs(stats.max)} |`,
+  ].join(' | ');
+}
+
+function formatMs(value: number): string {
+  return `${value.toFixed(3)}ms`;
 }
