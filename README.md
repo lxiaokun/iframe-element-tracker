@@ -549,6 +549,12 @@ npm run test:coverage
 
 # Run E2E tests (requires dev server running or auto-starts it)
 npm run test:e2e
+
+# Run automated performance benchmarks only
+npm run test:perf
+
+# Run the full pre-publish quality gate
+npm run test:publish
 ```
 
 ### Unit Tests
@@ -566,9 +572,20 @@ E2E tests (`tests/e2e/overlay.spec.ts`) verify the full tracking and overlay ren
 - Overlay creation and count
 - Overlay alignment under various iframe styles (Margin, Zoom, Transform, combinations)
 - Overlay mode switching
+- Interactive overlay click handling
+- Dynamic register/unregister lifecycle
 - Scroll tracking
+- Host and inner clip-path toggles
 - Element style E2E (margin, padding, border, border-radius, transform, opacity)
 - Inner overlay E2E (same-page overlay creation, alignment, and coexistence with host overlays)
+
+### Performance Tests
+
+Performance tests (`tests/e2e/performance.spec.ts`) drive the benchmark page in Playwright and assert:
+
+- Scroll-sync overlay updates remain faster than full recalculation
+- Host overlay update p95 stays inside a single-frame budget
+- Tracker-side occlusion detection stays within the release latency budget
 
 ## Demo
 
@@ -612,6 +629,12 @@ npm test
 
 # Run E2E tests
 npm run test:e2e
+
+# Run performance benchmarks only
+npm run test:perf
+
+# Run the full pre-publish quality gate
+npm run test:publish
 
 # Release a new version (interactive)
 npm run release

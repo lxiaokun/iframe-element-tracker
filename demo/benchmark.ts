@@ -25,6 +25,35 @@ interface Stats {
   max: number;
 }
 
+interface BenchmarkSideSnapshot {
+  label: string;
+  sampleCount: number;
+  stats: Stats | null;
+}
+
+interface BenchmarkSnapshot {
+  ready: boolean;
+  running: boolean;
+  old: BenchmarkSideSnapshot;
+  new: BenchmarkSideSnapshot;
+  baseline: BenchmarkSideSnapshot;
+  occlusion: BenchmarkSideSnapshot;
+}
+
+interface BenchmarkApi {
+  start: () => boolean;
+  stop: () => BenchmarkSnapshot;
+  reset: () => BenchmarkSnapshot;
+  runFor: (durationMs: number) => Promise<BenchmarkSnapshot>;
+  getSnapshot: () => BenchmarkSnapshot;
+}
+
+declare global {
+  interface Window {
+    __iframeTrackerBenchmark: BenchmarkApi;
+  }
+}
+
 // ─── State ───────────────────────────────────────────────────────────────────
 
 let benchRunning = false;
@@ -338,25 +367,39 @@ let newLoaded = false;
 let baselineLoaded = false;
 let occlusionLoaded = false;
 
-oldSide.iframe.addEventListener('load', () => {
+function onIframeReady(iframe: HTMLIFrameElement, callback: () => void) {
+  let called = false;
+  const runOnce = () => {
+    if (called) return;
+    called = true;
+    callback();
+  };
+
+  iframe.addEventListener('load', runOnce);
+  if (iframe.contentDocument?.readyState === 'complete') {
+    queueMicrotask(runOnce);
+  }
+}
+
+onIframeReady(oldSide.iframe, () => {
   console.log('[Benchmark] Old iframe loaded');
   initSide(oldSide, handleUpdateOld);
   oldLoaded = true;
 });
 
-newSide.iframe.addEventListener('load', () => {
+onIframeReady(newSide.iframe, () => {
   console.log('[Benchmark] New iframe loaded');
   initSide(newSide, handleUpdateNew);
   newLoaded = true;
 });
 
-baselineSide.iframe.addEventListener('load', () => {
+onIframeReady(baselineSide.iframe, () => {
   console.log('[Benchmark] Baseline iframe loaded');
   initSide(baselineSide, handleUpdateBaseline);
   baselineLoaded = true;
 });
 
-occlusionSide.iframe.addEventListener('load', () => {
+onIframeReady(occlusionSide.iframe, () => {
   console.log('[Benchmark] Occlusion iframe loaded');
   initSide(occlusionSide, handleUpdateOcclusion);
   occlusionLoaded = true;
@@ -472,68 +515,81 @@ function updateStatsDisplay() {
 
 // ─── Controls ────────────────────────────────────────────────────────────────
 
-btnStart.addEventListener('click', () => {
+function isReady(): boolean {
+  return oldLoaded && newLoaded && baselineLoaded && occlusionLoaded;
+}
+
+function getSideSnapshot(side: Side): BenchmarkSideSnapshot {
+  return {
+    label: side.label,
+    sampleCount: side.samples.length,
+    stats: computeStats(side.samples),
+  };
+}
+
+function getSnapshot(): BenchmarkSnapshot {
+  return {
+    ready: isReady(),
+    running: benchRunning,
+    old: getSideSnapshot(oldSide),
+    new: getSideSnapshot(newSide),
+    baseline: getSideSnapshot(baselineSide),
+    occlusion: getSideSnapshot(occlusionSide),
+  };
+}
+
+function startBenchmark(): boolean {
   if (!oldLoaded || !newLoaded || !baselineLoaded || !occlusionLoaded) {
     console.warn('[Benchmark] Iframes not loaded yet');
-    return;
+    return false;
   }
 
   if (benchRunning) {
-    // Stop
-    benchRunning = false;
-    btnStart.textContent = 'Start';
-    btnStart.classList.remove('running');
+    return true;
+  }
 
-    if (scrollAnimationId !== null) {
-      cancelAnimationFrame(scrollAnimationId);
-      scrollAnimationId = null;
-    }
-    if (statsTimerId !== null) {
-      clearInterval(statsTimerId);
-      statsTimerId = null;
-    }
+  benchRunning = true;
+  scrollDirection = 1;
+  btnStart.textContent = 'Stop';
+  btnStart.classList.add('running');
 
-    // Final stats update
+  scrollAnimationId = requestAnimationFrame(scrollStep);
+  statsTimerId = window.setInterval(updateStatsDisplay, 500);
+
+  return true;
+}
+
+function stopBenchmark(): BenchmarkSnapshot {
+  if (!benchRunning) {
     updateStatsDisplay();
-  } else {
-    // Start
-    benchRunning = true;
-    scrollDirection = 1;
-    btnStart.textContent = 'Stop';
-    btnStart.classList.add('running');
-
-    // Start auto-scroll
-    scrollAnimationId = requestAnimationFrame(scrollStep);
-
-    // Start stats refresh (every 500ms)
-    statsTimerId = window.setInterval(updateStatsDisplay, 500);
-  }
-});
-
-btnReset.addEventListener('click', () => {
-  // Stop if running
-  if (benchRunning) {
-    benchRunning = false;
-    btnStart.textContent = 'Start';
-    btnStart.classList.remove('running');
-
-    if (scrollAnimationId !== null) {
-      cancelAnimationFrame(scrollAnimationId);
-      scrollAnimationId = null;
-    }
-    if (statsTimerId !== null) {
-      clearInterval(statsTimerId);
-      statsTimerId = null;
-    }
+    return getSnapshot();
   }
 
-  // Clear samples
+  benchRunning = false;
+  btnStart.textContent = 'Start';
+  btnStart.classList.remove('running');
+
+  if (scrollAnimationId !== null) {
+    cancelAnimationFrame(scrollAnimationId);
+    scrollAnimationId = null;
+  }
+  if (statsTimerId !== null) {
+    clearInterval(statsTimerId);
+    statsTimerId = null;
+  }
+
+  updateStatsDisplay();
+  return getSnapshot();
+}
+
+function resetBenchmark(): BenchmarkSnapshot {
+  stopBenchmark();
+
   oldSide.samples = [];
   newSide.samples = [];
   baselineSide.samples = [];
   occlusionSide.samples = [];
 
-  // Reset display
   sampleCountEl.textContent = '0';
   speedupBadge.textContent = 'Speedup: --';
   occSampleCountEl.textContent = '0';
@@ -550,4 +606,39 @@ btnReset.addEventListener('click', () => {
       document.getElementById(`stat-${side}-${stat}`)!.textContent = '--';
     });
   });
+
+  return getSnapshot();
+}
+
+function runBenchmarkFor(durationMs: number): Promise<BenchmarkSnapshot> {
+  resetBenchmark();
+  if (!startBenchmark()) {
+    return Promise.resolve(getSnapshot());
+  }
+
+  return new Promise((resolve) => {
+    window.setTimeout(() => {
+      resolve(stopBenchmark());
+    }, durationMs);
+  });
+}
+
+btnStart.addEventListener('click', () => {
+  if (benchRunning) {
+    stopBenchmark();
+  } else {
+    startBenchmark();
+  }
 });
+
+btnReset.addEventListener('click', () => {
+  resetBenchmark();
+});
+
+window.__iframeTrackerBenchmark = {
+  start: startBenchmark,
+  stop: stopBenchmark,
+  reset: resetBenchmark,
+  runFor: runBenchmarkFor,
+  getSnapshot,
+};
