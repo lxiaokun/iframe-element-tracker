@@ -587,6 +587,10 @@ Performance tests (`tests/e2e/performance.spec.ts`) drive the benchmark page in 
 - Host overlay update p95 stays inside a single-frame budget
 - Tracker-side occlusion detection stays within the release latency budget
 
+Running `npm run test:perf` also writes Markdown and JSON reports to
+`test-results/performance/`. Set `PERF_REPORT_DIR=path/to/reports` to change the output
+directory.
+
 ## Demo
 
 Run the demo to see the SDK in action:
