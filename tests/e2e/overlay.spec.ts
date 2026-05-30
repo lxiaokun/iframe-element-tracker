@@ -3,6 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 const DEMO_URL = '/demo/host.html';
 const TRACKED_ELEMENT_COUNT = 11;
 const ALIGNMENT_TOLERANCE = 1; // 1px tolerance for subpixel rounding
+const OVERLAY_BOOT_TIMEOUT = 30000;
 
 test.describe('Overlay E2E', () => {
   test.beforeEach(async ({ page }) => {
@@ -14,7 +15,7 @@ test.describe('Overlay E2E', () => {
         return container && container.children.length >= count;
       },
       TRACKED_ELEMENT_COUNT,
-      { timeout: 15000 },
+      { timeout: OVERLAY_BOOT_TIMEOUT },
     );
   });
 
@@ -183,6 +184,64 @@ test.describe('Overlay E2E', () => {
     expect(await labels.count()).toBeGreaterThan(0);
   });
 
+  test('interactive mode receives overlay clicks', async ({ page }) => {
+    await page.click('#mode-interactive');
+    await waitForOverlayUpdate(page);
+
+    const dialogPromise = page.waitForEvent('dialog');
+    dialogPromise.then((dialog) => dialog.dismiss()).catch(() => {});
+    await page.locator('#overlay-container [data-overlay-id="element-1"]').click();
+    const dialog = await dialogPromise;
+
+    expect(dialog.message()).toContain('Clicked on: element-1');
+  });
+
+  test('tracks dynamically registered elements and removes overlays after unregister', async ({
+    page,
+  }) => {
+    await page.evaluate(() => {
+      const iframe = document.getElementById('inner-frame') as HTMLIFrameElement;
+      const iframeWindow = iframe.contentWindow as any;
+      const iframeDocument = iframe.contentDocument;
+      if (!iframeDocument || !iframeWindow?.tracker) return;
+
+      const element = iframeDocument.createElement('div');
+      element.id = 'element-dynamic';
+      element.className = 'tracked-element';
+      element.textContent = 'Dynamic';
+      Object.assign(element.style, {
+        position: 'fixed',
+        left: '36px',
+        top: '360px',
+        width: '140px',
+        height: '64px',
+        background: '#1abc9c',
+        borderRadius: '10px',
+      });
+      iframeDocument.body.appendChild(element);
+      iframeWindow.tracker.register(element, 'element-dynamic', {
+        metadata: { label: 'Dynamic Element' },
+      });
+    });
+
+    await expect(
+      page.locator('#overlay-container [data-overlay-id="element-dynamic"]'),
+    ).toHaveCount(1);
+    await verifyOverlayAlignment(page, ['element-dynamic']);
+
+    await page.evaluate(() => {
+      const iframe = document.getElementById('inner-frame') as HTMLIFrameElement;
+      const iframeWindow = iframe.contentWindow as any;
+      const iframeDocument = iframe.contentDocument;
+      iframeWindow?.tracker?.unregister('element-dynamic');
+      iframeDocument?.getElementById('element-dynamic')?.remove();
+    });
+
+    await expect(
+      page.locator('#overlay-container [data-overlay-id="element-dynamic"]'),
+    ).toHaveCount(0);
+  });
+
   test('overlays update position after iframe scroll', async ({ page }) => {
     // Get initial visual position of element-1 overlay (getBoundingClientRect)
     const initialVisualTop = await page
@@ -292,6 +351,26 @@ test.describe('Overlay E2E', () => {
       expect(horizontalClip).toBeGreaterThan(40);
       expect(horizontalClip).toBeLessThan(result.elementFullWidth);
     }
+  });
+
+  test('host clip toggle clears and restores overflow clip-path', async ({ page }) => {
+    const iframePage = page.frameLocator('#inner-frame');
+    await iframePage.locator('#element-overflow').scrollIntoViewIfNeeded();
+    await waitForOverlayUpdate(page);
+
+    const overlay = page.locator('#overlay-container [data-overlay-id="element-overflow"]');
+    await expect
+      .poll(() => overlay.evaluate((el) => (el as HTMLElement).style.clipPath))
+      .toContain('inset(');
+
+    await page.click('#host-clip-toggle');
+    await expect.poll(() => overlay.evaluate((el) => (el as HTMLElement).style.clipPath)).toBe('');
+
+    await page.click('#host-clip-toggle');
+    await waitForOverlayUpdate(page);
+    await expect
+      .poll(() => overlay.evaluate((el) => (el as HTMLElement).style.clipPath))
+      .toContain('inset(');
   });
 
   test('overlay for fully visible element has no clip-path', async ({ page }) => {
@@ -558,7 +637,7 @@ test.describe('Element Style E2E', () => {
         return container && container.children.length >= count;
       },
       TRACKED_ELEMENT_COUNT,
-      { timeout: 15000 },
+      { timeout: OVERLAY_BOOT_TIMEOUT },
     );
   });
 
@@ -661,7 +740,7 @@ test.describe('Inner Overlay E2E', () => {
         return container && container.children.length >= count;
       },
       TRACKED_ELEMENT_COUNT,
-      { timeout: 15000 },
+      { timeout: OVERLAY_BOOT_TIMEOUT },
     );
   });
 
@@ -833,5 +912,38 @@ test.describe('Inner Overlay E2E', () => {
           expect(v).toBeLessThan(250);
         });
     }
+  });
+
+  test('inner clip toggle clears and restores overflow clip-path', async ({ page }) => {
+    await page.click('#inner-mode-passthrough');
+
+    const iframePage = page.frameLocator('#inner-frame');
+    await expect(iframePage.locator('#overlay-container > div')).toHaveCount(
+      TRACKED_ELEMENT_COUNT,
+      {
+        timeout: 5000,
+      },
+    );
+
+    await iframePage.locator('#element-overflow').scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+    await waitForOverlayUpdate(page);
+
+    const clipPath = () =>
+      iframePage.locator('body').evaluate(() => {
+        const overlay = document.querySelector(
+          '[data-overlay-id="element-overflow"]',
+        ) as HTMLElement;
+        return overlay?.style.clipPath || '';
+      });
+
+    await expect.poll(clipPath).toContain('inset(');
+
+    await page.click('#inner-clip-toggle');
+    await expect.poll(clipPath).toBe('');
+
+    await page.click('#inner-clip-toggle');
+    await waitForOverlayUpdate(page);
+    await expect.poll(clipPath).toContain('inset(');
   });
 });

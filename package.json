@@ -53,6 +53,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "test:perf": "playwright test tests/e2e/performance.spec.ts",
+    "test:publish": "npm run lint && npx tsc --noEmit && npm test && npm run test:e2e && npm run build",
     "release": "release-it",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

@@ -664,14 +664,25 @@ innerClipToggle.addEventListener('click', () => {
   );
 });
 
-// Initialize after iframe loads
-iframe.addEventListener('load', () => {
+let isReceiverInitialized = false;
+
+function initializeAfterIframeLoad() {
+  if (isReceiverInitialized) return;
+  isReceiverInitialized = true;
+
   console.log('iframe loaded, initializing ElementReceiver');
   initReceiver();
 
   // Expose to global for debugging (after initialization)
   (window as any).receiver = receiver;
   (window as any).positioner = positioner;
-});
+}
+
+// Initialize after iframe loads. The readyState fallback handles the case where
+// the iframe loads before this module finishes registering the load listener.
+iframe.addEventListener('load', initializeAfterIframeLoad);
+if (iframe.contentDocument?.readyState === 'complete') {
+  queueMicrotask(initializeAfterIframeLoad);
+}
 
 (window as any).setMode = setMode;
