@@ -27,6 +27,7 @@ const elementsToTrack = [
   { id: 'element-overflow', label: 'Overflow Clipped' },
   { id: 'element-overflow-x', label: 'X-axis Clipped' },
   { id: 'element-occluded', label: 'Partially Occluded', detectOcclusion: true },
+  { id: 'element-sticky-occluded', label: 'Sticky Occluded', detectOcclusion: true },
 ];
 
 // ==================== Same-page overlay ====================

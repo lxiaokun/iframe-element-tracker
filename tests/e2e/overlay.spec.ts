@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 const DEMO_URL = '/demo/host.html';
-const TRACKED_ELEMENT_COUNT = 11;
+const TRACKED_ELEMENT_COUNT = 12;
 const ALIGNMENT_TOLERANCE = 1; // 1px tolerance for subpixel rounding
 const OVERLAY_BOOT_TIMEOUT = 30000;
 
@@ -436,6 +436,56 @@ test.describe('Overlay E2E', () => {
     // Should contain at least 2 Z commands (outer rect + at least one hole)
     const zCount = (clipPath.match(/Z/g) || []).length;
     expect(zCount).toBeGreaterThanOrEqual(2);
+  });
+
+  test('sticky high z-index element is detected as an occluder on scroll', async ({ page }) => {
+    // Bring the sticky-scroll container into the iframe viewport, then scroll
+    // inside it so the target slides under the sticky header.
+    const iframePage = page.frameLocator('#inner-frame');
+    await iframePage.locator('#sticky-scroll-container').evaluate((container) => {
+      container.scrollIntoView({ block: 'center' });
+      (container as HTMLElement).scrollTop = 30;
+    });
+    await page.waitForTimeout(300);
+    await waitForOverlayUpdate(page);
+
+    // Read the tracked occlusion data straight from the receiver (behavior, not format).
+    const result = await page.evaluate(() => {
+      const receiver = (window as any).receiver;
+      if (!receiver) return null;
+      const el = Array.from(receiver.getElements().values()).find(
+        (e: any) => e.id === 'element-sticky-occluded',
+      ) as any;
+      if (!el) return null;
+      return {
+        bounds: el.bounds,
+        occluders: el.occlusion?.occluders ?? [],
+      };
+    });
+
+    expect(result).not.toBeNull();
+    const { bounds, occluders } = result!;
+
+    // The sticky header must be reported as an occluder.
+    const sticky = occluders.find((o: any) => o.elementId === 'sticky-occluder');
+    expect(sticky).toBeTruthy();
+
+    // The occluder must cover the TOP of the target (that's where the sticky
+    // header sits), and its bounds must stay within the target's own bounds —
+    // guards against absurd values a format-only assertion would miss.
+    expect(sticky.bounds.y).toBeLessThanOrEqual(bounds.y + 1);
+    expect(sticky.bounds.height).toBeGreaterThan(0);
+    expect(sticky.bounds.height).toBeLessThanOrEqual(bounds.height + 1);
+    expect(sticky.bounds.width).toBeLessThanOrEqual(bounds.width + 1);
+
+    // The overlay must render an evenodd path (outer rect + hole for the occluder).
+    const clipPath = await page.evaluate(() => {
+      const overlay = document.querySelector(
+        '[data-overlay-id="element-sticky-occluded"]',
+      ) as HTMLElement;
+      return overlay?.style.clipPath || '';
+    });
+    expect(clipPath).toContain('path(evenodd');
   });
 
   test('overflow clip-path insets scale correctly with iframe transform', async ({ page }) => {
