@@ -1,8 +1,13 @@
 # iframe-element-tracker
 
+[![npm version](https://img.shields.io/npm/v/iframe-element-tracker.svg)](https://www.npmjs.com/package/iframe-element-tracker)
+[![npm downloads](https://img.shields.io/npm/dm/iframe-element-tracker.svg)](https://www.npmjs.com/package/iframe-element-tracker)
+[![license](https://img.shields.io/npm/l/iframe-element-tracker.svg)](./LICENSE)
+[![types](https://img.shields.io/npm/types/iframe-element-tracker.svg)](https://www.npmjs.com/package/iframe-element-tracker)
+
 用于追踪 iframe 内 DOM 元素并将其位置、尺寸、样式等信息同步到宿主页面的 SDK。
 
-[English](./README.md)
+[English](./README.md) · [GitHub](https://github.com/lxiaokun/iframe-element-tracker) · [Issues](https://github.com/lxiaokun/iframe-element-tracker/issues)
 
 ## 使用前提
 

@@ -1,6 +1,6 @@
 {
   "name": "iframe-element-tracker",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "A SDK for tracking DOM elements inside iframes and synchronizing their position, size, and style information to the host page",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -36,13 +36,27 @@
   ],
   "sideEffects": false,
   "license": "MIT",
+  "author": "lxiaokun (https://github.com/lxiaokun)",
+  "homepage": "https://github.com/lxiaokun/iframe-element-tracker#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lxiaokun/iframe-element-tracker.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lxiaokun/iframe-element-tracker/issues"
+  },
   "keywords": [
     "iframe",
     "element-tracker",
     "overlay",
     "postmessage",
     "dom",
-    "cross-iframe"
+    "cross-iframe",
+    "occlusion",
+    "clip-path",
+    "resize-observer",
+    "intersection-observer",
+    "typescript"
   ],
   "scripts": {
     "dev": "vite",
