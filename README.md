@@ -1,8 +1,13 @@
 # iframe-element-tracker
 
+[![npm version](https://img.shields.io/npm/v/iframe-element-tracker.svg)](https://www.npmjs.com/package/iframe-element-tracker)
+[![npm downloads](https://img.shields.io/npm/dm/iframe-element-tracker.svg)](https://www.npmjs.com/package/iframe-element-tracker)
+[![license](https://img.shields.io/npm/l/iframe-element-tracker.svg)](./LICENSE)
+[![types](https://img.shields.io/npm/types/iframe-element-tracker.svg)](https://www.npmjs.com/package/iframe-element-tracker)
+
 A SDK for tracking DOM elements inside iframes and synchronizing their position, size, and style information to the host page.
 
-[中文文档](./README.zh-CN.md)
+[中文文档](./README.zh-CN.md) · [GitHub](https://github.com/lxiaokun/iframe-element-tracker) · [Issues](https://github.com/lxiaokun/iframe-element-tracker/issues)
 
 ## Prerequisites
 
