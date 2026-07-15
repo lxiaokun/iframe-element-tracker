@@ -1,6 +1,6 @@
 {
   "name": "iframe-element-tracker",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A SDK for tracking DOM elements inside iframes and synchronizing their position, size, and style information to the host page",
   "type": "module",
   "main": "./dist/index.cjs",
