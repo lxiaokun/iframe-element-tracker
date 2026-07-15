@@ -615,6 +615,10 @@ npm run dev
 
 ## 开发
 
+### 环境要求
+
+- **Node.js 18+** —— 开发工具链（Vite、Vitest、ESLint 9）需要。发布出去的库本身是浏览器 SDK，运行时不依赖 Node。
+
 ### 脚本命令
 
 ```bash

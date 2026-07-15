@@ -616,6 +616,10 @@ Then open http://localhost:3000/demo/host.html
 
 ## Development
 
+### Requirements
+
+- **Node.js 18+** — required for the dev toolchain (Vite, Vitest, ESLint 9). The published library itself is a browser SDK and has no Node runtime dependency.
+
 ### Scripts
 
 ```bash
