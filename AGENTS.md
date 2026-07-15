@@ -58,6 +58,8 @@ iframe-element-tracker/
 
 ## Common Development Commands
 
+Development toolchain requires **Node.js 18+** (Vite 5, Vitest 3, ESLint 9). The published library is browser-only and has no runtime Node dependency, so `engines.node` is intentionally omitted from `package.json`.
+
 ```bash
 # Install dependencies
 npm install
