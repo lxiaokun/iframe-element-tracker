@@ -40,6 +40,7 @@ export class ElementReceiver {
     this.listeners.set('init', new Set());
     this.listeners.set('update', new Set());
     this.listeners.set('remove', new Set());
+    this.listeners.set('detach', new Set());
 
     // Only listen for message events when an iframe is provided
     if (this.iframe) {
@@ -130,6 +131,9 @@ export class ElementReceiver {
       case 'remove':
         this.handleRemove(message.elements);
         break;
+      case 'detach':
+        this.handleDetach(message.elements);
+        break;
     }
   }
 
@@ -186,6 +190,9 @@ export class ElementReceiver {
       case 'remove':
         this.handleRemove(message.elements);
         break;
+      case 'detach':
+        this.handleDetach(message.elements);
+        break;
     }
   }
 
@@ -223,6 +230,25 @@ export class ElementReceiver {
     }
     if (removed.length > 0) {
       this.emit('remove', removed);
+    }
+  }
+
+  /**
+   * Handle detach message (tracked element removed from document).
+   * Like remove, this clears the local cache, but emits a distinct 'detach'
+   * event so consumers can find replacement nodes when needed.
+   */
+  private handleDetach(elements: ElementRect[]): void {
+    const detached: ElementRect[] = [];
+    for (const element of elements) {
+      const existing = this.elements.get(element.id);
+      if (existing) {
+        detached.push(existing);
+        this.elements.delete(element.id);
+      }
+    }
+    if (detached.length > 0) {
+      this.emit('detach', detached);
     }
   }
 

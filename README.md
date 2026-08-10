@@ -119,6 +119,13 @@ receiver.on('remove', (elements) => {
   });
 });
 
+// Listen for tracked nodes detached from the document
+receiver.on('detach', (elements) => {
+  elements.forEach((el) => {
+    console.log(`Element ${el.id} detached; find and register its replacement if needed`);
+  });
+});
+
 // Get current element data
 const allElements = receiver.getElements();
 const singleElement = receiver.getElement('my-element');
@@ -376,7 +383,7 @@ When `iframe` is `null` or omitted, the receiver operates in same-page mode: it 
 
 | Method                          | Description                                                |
 | ------------------------------- | ---------------------------------------------------------- |
-| `on(event, callback)`           | Listen for events ('init', 'update', 'remove')             |
+| `on(event, callback)`           | Listen for events ('init', 'update', 'remove', 'detach')   |
 | `off(event, callback)`          | Remove event listener                                      |
 | `getElements()`                 | Get all tracked elements                                   |
 | `getElement(id)`                | Get a single element by ID                                 |

@@ -258,6 +258,10 @@ function startLocalTracking() {
     elements.forEach((el) => removeLocalOverlay(el.id));
   });
 
+  localReceiver.on('detach', (elements) => {
+    elements.forEach((el) => removeLocalOverlay(el.id));
+  });
+
   // Subscribe to tracker — auto-replays current state as 'init'
   unsubscribeListener = tracker.addMessageListener((msg) =>
     localReceiver!.handleTrackerMessage(msg),

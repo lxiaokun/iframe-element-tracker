@@ -108,6 +108,14 @@ function initReceiver() {
     elements.forEach((el) => removeOverlay(el.id));
     updateStatus();
   });
+
+  // Clear the overlay when a tracked node is removed, such as during a framework re-render.
+  // To keep tracking it, find the replacement node here and register it again.
+  receiver.on('detach', (elements) => {
+    console.log('Received detach:', elements);
+    elements.forEach((el) => removeOverlay(el.id));
+    updateStatus();
+  });
 }
 
 /**

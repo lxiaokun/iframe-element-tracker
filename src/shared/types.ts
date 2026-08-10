@@ -141,8 +141,16 @@ export interface ElementRect {
 
 /**
  * Message action type
+ *
+ * - `init`: Initial report after an element is registered
+ * - `update`: Element position or style changed
+ * - `remove`: Consumer explicitly unregistered the element
+ * - `detach`: The tracked element was removed from the document, such as
+ *   during a framework re-render. The tracker automatically unregisters it
+ *   and releases the detached node reference. Consumers should clear related
+ *   state and may register a replacement node with the same ID.
  */
-export type MessageAction = 'init' | 'update' | 'remove';
+export type MessageAction = 'init' | 'update' | 'remove' | 'detach';
 
 /**
  * Scroll container state (window or user-specified element)

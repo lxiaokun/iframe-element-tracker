@@ -84,11 +84,13 @@ export class ElementTracker {
   private targetOrigin: string;
   private resizeObserver: ResizeObserver;
   private intersectionObserver: IntersectionObserver;
+  private mutationObserver: MutationObserver;
   private scrollHandler: () => void;
   private resizeHandler: () => void;
   private onMessage: ((message: TrackerMessage) => void) | null;
   private messageListeners: Set<TrackerMessageListener> = new Set();
   private pendingUpdate: number | null = null;
+  private detachCheckScheduled = false;
   private isDestroyed = false;
   private scrollContainer: HTMLElement | null;
   private detectOcclusion: boolean;
@@ -126,6 +128,16 @@ export class ElementTracker {
       this.performUpdate();
     };
 
+    // ResizeObserver and IntersectionObserver cannot detect node removal.
+    // During framework re-renders they may only report a zero-sized element,
+    // so use MutationObserver to emit 'detach' and release detached references.
+    // Observe document because the tracker may be created before documentElement
+    // exists, and document-level child-list changes include replacing it.
+    this.mutationObserver = new MutationObserver(() => {
+      this.scheduleDetachCheck();
+    });
+    this.mutationObserver.observe(document, { childList: true, subtree: true });
+
     // Bind events
     const scrollTarget: EventTarget = this.scrollContainer ?? window;
     scrollTarget.addEventListener('scroll', this.scrollHandler, { passive: true, capture: true });
@@ -159,7 +171,9 @@ export class ElementTracker {
     this.intersectionObserver.observe(element);
 
     // Send initial state immediately
-    this.sendUpdate('init', [this.getElementRect(tracked)]);
+    const initialRect = this.getElementRect(tracked);
+    tracked.lastRect = initialRect;
+    this.sendUpdate('init', [initialRect]);
   }
 
   /**
@@ -176,7 +190,7 @@ export class ElementTracker {
     this.trackedElements.delete(id);
 
     // Send remove notification
-    this.sendUpdate('remove', [{ id } as ElementRect]);
+    this.sendUpdate('remove', [tracked.lastRect ?? this.getElementRect(tracked)]);
   }
 
   /**
@@ -265,6 +279,7 @@ export class ElementTracker {
 
     this.resizeObserver.disconnect();
     this.intersectionObserver.disconnect();
+    this.mutationObserver.disconnect();
     this.trackedElements.clear();
     this.messageListeners.clear();
   }
@@ -281,6 +296,49 @@ export class ElementTracker {
       this.pendingUpdate = null;
       this.performUpdate();
     });
+  }
+
+  /**
+   * Schedule a detach check in a microtask.
+   * MutationObserver callbacks may be frequent during streaming renders, so
+   * coalesce callbacks without relying on animation frames, which may pause
+   * when the document is in the background.
+   */
+  private scheduleDetachCheck(): void {
+    if (this.detachCheckScheduled || this.isDestroyed) {
+      return;
+    }
+
+    this.detachCheckScheduled = true;
+    queueMicrotask(() => {
+      this.detachCheckScheduled = false;
+      this.performDetachCheck();
+    });
+  }
+
+  /**
+   * Check whether tracked elements have been detached from the document.
+   * Stop observing detached elements, release their references, and emit a
+   * 'detach' message so consumers can clean up or register replacements.
+   */
+  private performDetachCheck(): void {
+    if (this.isDestroyed || this.trackedElements.size === 0) {
+      return;
+    }
+
+    const detached: ElementRect[] = [];
+    for (const tracked of this.trackedElements.values()) {
+      if (!tracked.element.isConnected) {
+        this.resizeObserver.unobserve(tracked.element);
+        this.intersectionObserver.unobserve(tracked.element);
+        this.trackedElements.delete(tracked.id);
+        detached.push(tracked.lastRect ?? this.getElementRect(tracked));
+      }
+    }
+
+    if (detached.length > 0) {
+      this.sendUpdate('detach', detached);
+    }
   }
 
   /**

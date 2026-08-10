@@ -119,6 +119,13 @@ receiver.on('remove', (elements) => {
   });
 });
 
+// 监听追踪节点从文档中分离
+receiver.on('detach', (elements) => {
+  elements.forEach((el) => {
+    console.log(`元素 ${el.id} 已分离；如需继续追踪，请查找并注册替代节点`);
+  });
+});
+
 // 获取当前元素数据
 const allElements = receiver.getElements();
 const singleElement = receiver.getElement('my-element');
@@ -374,17 +381,17 @@ new ElementReceiver(iframe?: HTMLIFrameElement | null, options?: ReceiverOptions
 
 #### 方法
 
-| 方法                            | 描述                                          |
-| ------------------------------- | --------------------------------------------- |
-| `on(event, callback)`           | 监听事件（'init'、'update'、'remove'）        |
-| `off(event, callback)`          | 移除事件监听                                  |
-| `getElements()`                 | 获取所有追踪的元素                            |
-| `getElement(id)`                | 根据 ID 获取单个元素                          |
-| `getIframe()`                   | 获取绑定的 iframe 元素（同页模式返回 `null`） |
-| `getIframeBounds()`             | 获取 iframe 的边界矩形（同页模式返回 `null`） |
-| `getContainerScroll()`          | 获取滚动容器的最新状态                        |
-| `handleTrackerMessage(message)` | 直接处理 TrackerMessage（用于同页模式）       |
-| `destroy()`                     | 清理所有资源                                  |
+| 方法                            | 描述                                             |
+| ------------------------------- | ------------------------------------------------ |
+| `on(event, callback)`           | 监听事件（'init'、'update'、'remove'、'detach'） |
+| `off(event, callback)`          | 移除事件监听                                     |
+| `getElements()`                 | 获取所有追踪的元素                               |
+| `getElement(id)`                | 根据 ID 获取单个元素                             |
+| `getIframe()`                   | 获取绑定的 iframe 元素（同页模式返回 `null`）    |
+| `getIframeBounds()`             | 获取 iframe 的边界矩形（同页模式返回 `null`）    |
+| `getContainerScroll()`          | 获取滚动容器的最新状态                           |
+| `handleTrackerMessage(message)` | 直接处理 TrackerMessage（用于同页模式）          |
+| `destroy()`                     | 清理所有资源                                     |
 
 ### OverlayPositioner
 

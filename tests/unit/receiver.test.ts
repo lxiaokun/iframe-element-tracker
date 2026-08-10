@@ -116,6 +116,30 @@ describe('ElementReceiver', () => {
       expect(receiver.getElement('el-1')).toBeUndefined();
     });
 
+    it('clears elements and fires detach event on detach message', () => {
+      const detachCallback = vi.fn();
+      const removeCallback = vi.fn();
+      receiver.on('detach', detachCallback);
+      receiver.on('remove', removeCallback);
+
+      // Init first
+      const initElements = [createElementRect({ id: 'el-1' })];
+      dispatchMessage(createTrackerMessage('init', initElements), mockContentWindow);
+      expect(receiver.getElement('el-1')).toBeDefined();
+
+      // Then detach after the tracker detects node removal
+      dispatchMessage(
+        createTrackerMessage('detach', [{ id: 'el-1' } as ElementRect]),
+        mockContentWindow,
+      );
+
+      expect(detachCallback).toHaveBeenCalledOnce();
+      expect(detachCallback.mock.calls[0][0].map((e: ElementRect) => e.id)).toContain('el-1');
+      // Detach must not emit remove because the events have different semantics
+      expect(removeCallback).not.toHaveBeenCalled();
+      expect(receiver.getElement('el-1')).toBeUndefined();
+    });
+
     it('ignores messages from non-target iframe source', () => {
       const callback = vi.fn();
       receiver.on('init', callback);

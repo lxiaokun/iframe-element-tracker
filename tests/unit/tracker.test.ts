@@ -79,6 +79,12 @@ describe('ElementTracker', () => {
       const msg = mockTargetWindow.postMessage.mock.calls[0][0] as TrackerMessage;
       expect(msg.action).toBe('remove');
       expect(msg.elements[0].id).toBe('test-el');
+      expect(msg.elements[0].bounds).toEqual({
+        x: 100,
+        y: 50,
+        width: 200,
+        height: 100,
+      });
     });
 
     it('warns on duplicate registration', () => {
@@ -317,6 +323,78 @@ describe('ElementTracker', () => {
         tracker.destroy();
         tracker.destroy();
       }).not.toThrow();
+    });
+  });
+
+  // ==================== detach detection ====================
+
+  describe('detach detection', () => {
+    /** Wait for the MutationObserver and detach-check microtasks to complete. */
+    const waitForDetachMessage = async (): Promise<TrackerMessage | undefined> => {
+      for (let i = 0; i < 25; i++) {
+        await new Promise((r) => setTimeout(r, 20));
+        const msg = mockTargetWindow.postMessage.mock.calls
+          .map(([m]) => m as TrackerMessage)
+          .find((m) => m.action === 'detach');
+        if (msg) return msg;
+      }
+      return undefined;
+    };
+
+    it('sends a complete detach message without waiting for an animation frame', async () => {
+      tracker.register(testElement, 'test-el');
+      mockTargetWindow.postMessage.mockClear();
+      vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 1);
+
+      testElement.remove();
+      const detachMsg = await waitForDetachMessage();
+
+      expect(detachMsg).toBeTruthy();
+      expect(detachMsg!.type).toBe(MESSAGE_TYPE);
+      expect(detachMsg!.elements.map((e) => e.id)).toContain('test-el');
+      expect(detachMsg!.elements[0].bounds).toEqual({
+        x: 100,
+        y: 50,
+        width: 200,
+        height: 100,
+      });
+
+      // The detached reference is released, so forceUpdate has nothing to report
+      mockTargetWindow.postMessage.mockClear();
+      tracker.forceUpdate();
+      expect(mockTargetWindow.postMessage).not.toHaveBeenCalled();
+    });
+
+    it('allows re-registering the same id after detach (framework re-render scenario)', async () => {
+      tracker.register(testElement, 'test-el');
+      testElement.remove();
+      await waitForDetachMessage();
+
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const newEl = document.createElement('div');
+      document.body.appendChild(newEl);
+      mockTargetWindow.postMessage.mockClear();
+
+      tracker.register(newEl, 'test-el');
+
+      expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('already registered'));
+      const msgs = mockTargetWindow.postMessage.mock.calls.map(([m]) => m as TrackerMessage);
+      expect(msgs.some((m) => m.action === 'init' && m.elements[0].id === 'test-el')).toBe(true);
+      newEl.remove();
+    });
+
+    it('does not send detach for elements still connected', async () => {
+      tracker.register(testElement, 'test-el');
+      mockTargetWindow.postMessage.mockClear();
+
+      // An unrelated DOM mutation must not produce a false detach event
+      const noise = document.createElement('div');
+      document.body.appendChild(noise);
+      noise.remove();
+      await new Promise((r) => setTimeout(r, 80));
+
+      const msgs = mockTargetWindow.postMessage.mock.calls.map(([m]) => m as TrackerMessage);
+      expect(msgs.every((m) => m.action !== 'detach')).toBe(true);
     });
   });
 
